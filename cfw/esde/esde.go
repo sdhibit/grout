@@ -100,19 +100,45 @@ func explicitBase() string {
 	return os.Getenv("BASE_PATH")
 }
 
+// romsAnchoredBase infers the install root from the launcher-reported ROM
+// directory. EmuDeck and RetroDECK lay out ROMs at <base>/roms, and the ES-DE
+// launcher always exports GROUT_ESDE_ROMS_DIR pointing at the real ROM dir
+// (derived from where Grout itself is installed, inside <base>/roms/ports). Its
+// parent is therefore the true install root, so BIOS and saves land on the same
+// volume as the ROMs even for SD-card or relocated installs. Returns "" when the
+// env var is unset (e.g. running outside the launcher).
+func romsAnchoredBase() string {
+	if p := os.Getenv("GROUT_ESDE_ROMS_DIR"); p != "" {
+		return filepath.Dir(p)
+	}
+	return ""
+}
+
 func GetBasePath() string {
 	if base := explicitBase(); base != "" {
 		return base
 	}
-	if p := discoveredBasePath(); p != "" {
-		return p
-	}
 	switch CurrentVariant() {
 	case VariantEmuDeck:
+		if p := romsAnchoredBase(); p != "" {
+			return p
+		}
+		if p := discoveredBasePath(); p != "" {
+			return p
+		}
 		return filepath.Join(homeDir(), "Emulation")
 	case VariantRetroDeck:
+		if p := romsAnchoredBase(); p != "" {
+			return p
+		}
+		if p := discoveredBasePath(); p != "" {
+			return p
+		}
 		return filepath.Join(homeDir(), "retrodeck")
 	default:
+		if p := discoveredBasePath(); p != "" {
+			return p
+		}
 		return homeDir()
 	}
 }

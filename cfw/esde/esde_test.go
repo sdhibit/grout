@@ -122,6 +122,34 @@ func TestExplicitOverridesWin(t *testing.T) {
 	}
 }
 
+func TestBaseAnchoredToLauncherRomsDir(t *testing.T) {
+	// The launcher exports GROUT_ESDE_ROMS_DIR from where Grout is installed
+	// (<base>/roms/ports), so BIOS and saves must follow ROMs to that volume
+	// even for an SD-card install where the static default would be wrong.
+	withTestHome(t)
+	Configure(&Settings{Variant: VariantEmuDeck})
+	t.Setenv("GROUT_ESDE_ROMS_DIR", "/run/media/sdcard/Emulation/roms")
+
+	if got, want := GetBasePath(), "/run/media/sdcard/Emulation"; got != want {
+		t.Errorf("GetBasePath() = %q, want %q", got, want)
+	}
+	if got, want := GetRomDirectory(), "/run/media/sdcard/Emulation/roms"; got != want {
+		t.Errorf("GetRomDirectory() = %q, want %q", got, want)
+	}
+	if got, want := GetBIOSDirectory(), "/run/media/sdcard/Emulation/bios"; got != want {
+		t.Errorf("GetBIOSDirectory() = %q, want %q", got, want)
+	}
+	if got, want := GetBaseSavePath(), "/run/media/sdcard/Emulation/saves"; got != want {
+		t.Errorf("GetBaseSavePath() = %q, want %q", got, want)
+	}
+
+	// An explicit base override still wins over the launcher anchor.
+	Configure(&Settings{Variant: VariantEmuDeck, BasePath: "/custom/root"})
+	if got, want := GetBIOSDirectory(), "/custom/root/bios"; got != want {
+		t.Errorf("GetBIOSDirectory() with override = %q, want %q", got, want)
+	}
+}
+
 func TestBasePathOverrideFlowsToChildDirs(t *testing.T) {
 	withTestHome(t)
 	Configure(&Settings{Variant: VariantEmuDeck, BasePath: "/run/media/sdcard/Emulation"})

@@ -99,6 +99,8 @@ func setupInputMapping(currentCFW cfw.CFW) {
 		mappingBytes, mappingErr = rocknix.GetInputMappingBytes()
 	case cfw.ArkOS:
 		mappingBytes, mappingErr = arkos.GetInputMappingBytes()
+	case cfw.ESDE:
+		mappingBytes, mappingErr = esde.GetInputMappingBytes()
 	}
 
 	if mappingBytes != nil && mappingErr == nil {
@@ -143,11 +145,13 @@ func initFramework(currentCFW cfw.CFW) {
 	gaba.Init(gabaOptions)
 
 	if currentCFW == cfw.ESDE {
-		// Steam Deck/Steam Input can emit continuous tiny analog-stick motion
-		// events, which flood SDL's event queue and make button input appear
-		// delayed or jittery. D-pad/buttons are sufficient for Grout
-		// navigation, so drop axis motion events.
-		sdl.EventState(sdl.CONTROLLERAXISMOTION, sdl.IGNORE)
+		// The Steam Deck's analog sticks emit continuous motion events that can
+		// flood SDL's event queue. Grout navigates with the d-pad, so ignore the
+		// raw-joystick axis stream. We deliberately keep CONTROLLERAXISMOTION
+		// enabled: the L2/R2 triggers are reported as game-controller axes and
+		// L2 is what opens the BIOS menu, so ignoring it would break trigger
+		// input entirely. The stick axes stay unmapped in the input mapping, so
+		// their motion events are discarded cheaply while triggers still work.
 		sdl.EventState(sdl.JOYAXISMOTION, sdl.IGNORE)
 	}
 

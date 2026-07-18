@@ -33,8 +33,10 @@ export CFW=ESDE
 export GROUT_ESDE_ROMS_DIR="$(cd "$CUR_DIR/.." && pwd)"
 export LD_LIBRARY_PATH="$APP_DIR/lib:$LD_LIBRARY_PATH"
 
-# Steam Deck uses Xbox-style face buttons, so use direct A=A/B=B mappings.
-export FLIP_FACE_BUTTONS=1
+# Face-button orientation is handled by Grout's bundled ES-DE input mapping
+# (direct A=A/B=B for the Deck's Xbox layout) and the in-app "Swap Face Buttons"
+# setting. Do NOT export FLIP_FACE_BUTTONS here: the env var overrides and pins
+# that setting, making the in-app toggle a no-op.
 
 # Prefer SDL's game controller API and ignore duplicate keyboard/raw joystick events.
 export DISABLE_KEYBOARD_INPUT=1

@@ -313,7 +313,7 @@ func (s *GameListScreen) Draw(input GameListInput) (GameListOutput, error) {
 
 	if hasBIOS && !internal.IsKidModeEnabled() {
 		menuButtonName := i18n.Localize(&goi18n.Message{ID: "button_menu", Other: "Menu"}, nil)
-		if environment.IsMiyoo() {
+		if environment.IsMiyoo() || environment.IsESDE() {
 			menuButtonName = "L2"
 		}
 		footerItems = append(footerItems, gaba.FooterHelpItem{ButtonName: menuButtonName, HelpText: i18n.Localize(&goi18n.Message{ID: "button_bios", Other: "BIOS"}, nil)})

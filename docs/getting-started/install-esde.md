@@ -65,6 +65,42 @@ artwork goes into ES-DE's `downloaded_media` layout (covers, marquees,
 backcovers, fan art, videos, manuals), so everything shows up natively in
 ES-DE's UI.
 
+## Steam Deck Controls
+
+Grout ships a Steam Deck controller mapping, so the face buttons follow the
+Deck's Xbox layout (A confirms, B goes back) out of the box. If you prefer the
+Nintendo-style A/B swap, toggle **Swap Face Buttons** in *Settings → General*.
+
+| Button                     | Action                                    |
+|----------------------------|-------------------------------------------|
+| D-pad                      | Navigate                                  |
+| A / B                      | Confirm / Back                            |
+| X / Y                      | Context actions (e.g. Filters)            |
+| ☰ (right of right stick)   | Start / confirm (e.g. platform mapping)   |
+| ⊟ (left of left stick)     | Select / reorder / multi-select           |
+| **L2**                     | **Menu — opens BIOS download** on a platform's game list |
+
+!!! note "Why L2 for the menu?"
+    Steam Input reserves the Steam and Quick-Access buttons, so Grout can't use
+    them. The **L2** trigger (or clicking the left stick) opens the menu instead.
+    The back paddles (L4/L5/R4/R5) are not visible to apps unless you bind them
+    in Steam Input, so Grout can't use those either.
+
+## BIOS Files
+
+BIOS files download into your setup's BIOS directory using RetroArch/libretro
+standard names and subfolders (e.g. `gba_bios.bin`, `psx/scph5501.bin`):
+
+- **EmuDeck** → `<Emulation>/bios` (the same folder EmuDeck's *BIOS Checker*
+  scans; it is case-sensitive, so verify there if a game reports a missing BIOS)
+- **RetroDECK** → the `bios_path` from your `retrodeck.json`
+- **Vanilla ES-DE** → `~/.config/retroarch/system` by default (override in
+  *Settings → ES-DE Settings* if your emulators look elsewhere)
+
+Grout keeps BIOS and saves on the same volume as your ROMs, so SD-card installs
+work without extra configuration. You can confirm the exact target path any time
+in *Settings → ES-DE Settings*.
+
 ## Update
 
 ### In-App update (Recommended)
