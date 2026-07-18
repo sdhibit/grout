@@ -1,11 +1,99 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
+	"grout/cfw"
 	"grout/romm"
+
+	gaba "github.com/BrandonKowalski/gabagool/v2/pkg/gabagool"
 )
+
+// romDirEntries creates the given folders under a temp dir and returns its
+// os.DirEntry listing, for exercising folder-detection logic.
+func romDirEntries(t *testing.T, folders ...string) []os.DirEntry {
+	t.Helper()
+	tmp := t.TempDir()
+	for _, f := range folders {
+		if err := os.MkdirAll(filepath.Join(tmp, f), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entries, err := os.ReadDir(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return entries
+}
+
+func TestPreferredExistingOptionIndex(t *testing.T) {
+	s := &PlatformMappingScreen{}
+
+	// Option layout mirrors buildPlatformOptions: Skip, then Create/existing
+	// entries, then a trailing Custom keyboard entry.
+	opts := func(values ...string) []gaba.Option {
+		out := []gaba.Option{{Value: ""}} // Skip
+		for _, v := range values {
+			out = append(out, gaba.Option{Value: v})
+		}
+		out = append(out, gaba.Option{Type: gaba.OptionTypeKeyboard, Value: ""}) // Custom
+		return out
+	}
+
+	cases := []struct {
+		name    string
+		folders []string // physically present ROM folders
+		cfwDirs []string // platform's folder names, primary first
+		options []gaba.Option
+		wantIdx int
+	}{
+		{
+			// EmuDeck created "megadrive" for Sega Genesis; primary "genesis" is absent.
+			name:    "alias folder auto-selected",
+			folders: []string{"megadrive", "snes"},
+			cfwDirs: []string{"genesis", "megadrive"},
+			options: opts("genesis", "megadrive"), // Create 'genesis', /megadrive
+			wantIdx: 2,
+		},
+		{
+			// Both exist: primary wins.
+			name:    "primary preferred over alias",
+			folders: []string{"genesis", "megadrive"},
+			cfwDirs: []string{"genesis", "megadrive"},
+			options: opts("genesis", "megadrive"),
+			wantIdx: 1,
+		},
+		{
+			// Shared secondary alias must not steal selection from the primary.
+			name:    "primary wins over shared secondary",
+			folders: []string{"arcade", "neogeo"},
+			cfwDirs: []string{"arcade", "mame", "fbneo", "neogeo"},
+			options: opts("arcade", "neogeo"),
+			wantIdx: 1,
+		},
+		{
+			// Nothing present -> no auto-select (Skip).
+			name:    "no match falls through to skip",
+			folders: []string{"snes"},
+			cfwDirs: []string{"genesis", "megadrive"},
+			options: opts("genesis", "megadrive"),
+			wantIdx: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			entries := romDirEntries(t, tc.folders...)
+			got := s.preferredExistingOptionIndex(tc.options, entries, tc.cfwDirs, cfw.ESDE)
+			if got != tc.wantIdx {
+				t.Errorf("preferredExistingOptionIndex() = %d, want %d", got, tc.wantIdx)
+			}
+		})
+	}
+}
 
 // The platform-mapping filters (Category/Family) are built from the distinct values
 // present across platforms; when RomM doesn't populate a field, the list is empty and

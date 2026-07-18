@@ -562,17 +562,22 @@ func (s *PlatformMappingScreen) buildPlatformOptions(
 				Value:       dirName,
 			})
 
-			if hasExistingMappings {
-				// For return visits, only select if this platform has a mapping and it matches
-				if platformHasMapping && dirName == existingMapping.RelativePath {
-					selectedIndex = len(options) - 1
-				}
-			} else {
-				// First time: auto-detect based on directory name matching platform
-				if s.directoryMatchesPlatform(platform, romDir.Name(), input.CFW) {
-					selectedIndex = len(options) - 1
-				}
+			// For return visits, select the saved mapping. First-run
+			// auto-detection is handled after the loop in preference order.
+			if hasExistingMappings && platformHasMapping && dirName == existingMapping.RelativePath {
+				selectedIndex = len(options) - 1
 			}
+		}
+	}
+
+	// First run: auto-select the existing ROM folder that best matches this
+	// platform, scanning the CFW's folder names in preference order (the primary
+	// name first, then its aliases). This lets frontends that pre-create system
+	// folders (EmuDeck, RetroDECK, Batocera) map correctly without manual
+	// selection, even when they use an alias such as "megadrive" for Sega Genesis.
+	if !hasExistingMappings {
+		if idx := s.preferredExistingOptionIndex(options, romDirectories, cfwDirectories, input.CFW); idx > 0 {
+			selectedIndex = idx
 		}
 	}
 
@@ -607,20 +612,41 @@ func (s *PlatformMappingScreen) buildPlatformOptions(
 	return options, selectedIndex
 }
 
-func (s *PlatformMappingScreen) directoryMatchesPlatform(
-	platform romm.Platform,
-	dirName string,
+// preferredExistingOptionIndex returns the index of the option for the existing
+// ROM directory that best matches this platform, preferring earlier entries in
+// cfwDirectories (the CFW's primary folder name, then its aliases). Only folders
+// that physically exist are considered, so it never auto-selects a "Create"
+// option. Returns 0 (the Skip option) when nothing matches.
+func (s *PlatformMappingScreen) preferredExistingOptionIndex(
+	options []gaba.Option,
+	romDirectories []os.DirEntry,
+	cfwDirectories []string,
 	c cfw.CFW,
-) bool {
-	cfwFSSlug := cfw.RomMFSSlugToCFW(platform.FSSlug)
-	romFolderBase := cfw.RomFolderBase(dirName, stringutil.ParseTag)
-
-	switch c {
-	case cfw.NextUI, cfw.MinUI:
-		return stringutil.ParseTag(cfwFSSlug) == romFolderBase
-	default:
-		return cfwFSSlug == romFolderBase
+) int {
+	existing := make(map[string]bool, len(romDirectories))
+	for _, romDir := range romDirectories {
+		existing[cfw.RomFolderBase(romDir.Name(), stringutil.ParseTag)] = true
 	}
+
+	for _, cfwDir := range cfwDirectories {
+		target := cfw.RomFolderBase(cfwDir, stringutil.ParseTag)
+		if !existing[target] {
+			continue
+		}
+		for i, opt := range options {
+			if opt.Type == gaba.OptionTypeKeyboard {
+				continue // skip the Custom... keyboard entry
+			}
+			v, ok := opt.Value.(string)
+			if !ok || v == "" {
+				continue // skip the Skip entry
+			}
+			if cfw.RomFolderBase(v, stringutil.ParseTag) == target {
+				return i
+			}
+		}
+	}
+	return 0
 }
 
 func (s *PlatformMappingScreen) getCFWDirectoriesForPlatform(fsSlug string, c cfw.CFW, platformsBinding map[string]string) []string {
