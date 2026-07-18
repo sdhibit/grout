@@ -313,8 +313,14 @@ func (s *GameListScreen) Draw(input GameListInput) (GameListOutput, error) {
 
 	if hasBIOS && !internal.IsKidModeEnabled() {
 		menuButtonName := i18n.Localize(&goi18n.Message{ID: "button_menu", Other: "Menu"}, nil)
-		if environment.IsMiyoo() || environment.IsESDE() {
+		if environment.IsMiyoo() {
 			menuButtonName = "L2"
+		} else if environment.IsESDE() {
+			// On the Steam Deck the analog L2 trigger isn't reliably delivered
+			// through Steam Input + SDL, so advertise the left-stick click (L3),
+			// which is a plain button and always works. The L2 trigger stays
+			// mapped as a bonus for setups where it does fire.
+			menuButtonName = "L3"
 		}
 		footerItems = append(footerItems, gaba.FooterHelpItem{ButtonName: menuButtonName, HelpText: i18n.Localize(&goi18n.Message{ID: "button_bios", Other: "BIOS"}, nil)})
 	}

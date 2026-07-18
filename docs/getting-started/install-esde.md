@@ -81,13 +81,16 @@ you prefer the Nintendo-style A/B swap, toggle **Swap Face Buttons** in
 | X / Y                      | Context actions (e.g. Filters)            |
 | ☰ (right of right stick)   | Start / confirm (e.g. platform mapping)   |
 | ⊟ (left of left stick)     | Select / reorder / multi-select           |
-| **L2**                     | **Menu — opens BIOS download** on a platform's game list |
+| **L3 (click left stick)**  | **Menu — opens BIOS download** on a platform's game list |
 
-!!! note "Why L2 for the menu?"
+!!! note "Why the left-stick click for the menu?"
     Steam Input reserves the Steam and Quick-Access buttons, so Grout can't use
-    them. The **L2** trigger (or clicking the left stick) opens the menu instead.
-    The back/grip paddles (L4/L5/R4/R5) are not visible to apps unless you bind
-    them in Steam Input, so Grout can't use those either.
+    them for the menu. Clicking in the **left stick (L3)** opens it — a plain
+    button that Steam Input always passes through reliably. The **L2** trigger is
+    also mapped and works on setups where Steam Input delivers it as an analog
+    trigger, but that varies, so L3 is the dependable one. The back/grip paddles
+    (L4/L5/R4/R5) aren't visible to apps unless you bind them in Steam Input, so
+    Grout can't use those either.
 
 Grout also bundles a current SDL controller database (`gamecontrollerdb.txt`)
 and points SDL at it, so newer controllers are recognized even when run outside
