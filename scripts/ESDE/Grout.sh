@@ -42,6 +42,14 @@ export LD_LIBRARY_PATH="$APP_DIR/lib:$LD_LIBRARY_PATH"
 export DISABLE_KEYBOARD_INPUT=1
 export DISABLE_JOYSTICK_INPUT=1
 
+# Teach SDL about controllers newer than its built-in database (e.g. the current
+# Steam Controller) so they're recognized as game controllers. Under Steam Input
+# in Game Mode the device is already a virtual Xbox pad and this is a harmless
+# no-op; it matters when running the raw controller in Desktop Mode.
+if [ -f "$APP_DIR/gamecontrollerdb.txt" ]; then
+    export SDL_GAMECONTROLLERCONFIG_FILE="$APP_DIR/gamecontrollerdb.txt"
+fi
+
 # Grout uses its own gamepad-driven keyboard. On Steam Deck, SDL/Steam can
 # also surface the Steam keyboard, which can interfere with Grout's keyboard.
 export SDL_ENABLE_SCREEN_KEYBOARD=0

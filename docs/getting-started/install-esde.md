@@ -65,11 +65,14 @@ artwork goes into ES-DE's `downloaded_media` layout (covers, marquees,
 backcovers, fan art, videos, manuals), so everything shows up natively in
 ES-DE's UI.
 
-## Steam Deck Controls
+## Controls (Steam Deck / Steam Machine / Steam Controller)
 
-Grout ships a Steam Deck controller mapping, so the face buttons follow the
-Deck's Xbox layout (A confirms, B goes back) out of the box. If you prefer the
-Nintendo-style A/B swap, toggle **Swap Face Buttons** in *Settings → General*.
+Grout ships a controller mapping keyed on SDL's standard game-controller layout,
+so it behaves the same across all Steam Input hardware — the Steam Deck, the
+Steam Machine, and the Steam Controller all present the same virtual Xbox pad.
+Face buttons follow the Xbox layout (A confirms, B goes back) out of the box. If
+you prefer the Nintendo-style A/B swap, toggle **Swap Face Buttons** in
+*Settings → General*.
 
 | Button                     | Action                                    |
 |----------------------------|-------------------------------------------|
@@ -83,8 +86,15 @@ Nintendo-style A/B swap, toggle **Swap Face Buttons** in *Settings → General*.
 !!! note "Why L2 for the menu?"
     Steam Input reserves the Steam and Quick-Access buttons, so Grout can't use
     them. The **L2** trigger (or clicking the left stick) opens the menu instead.
-    The back paddles (L4/L5/R4/R5) are not visible to apps unless you bind them
-    in Steam Input, so Grout can't use those either.
+    The back/grip paddles (L4/L5/R4/R5) are not visible to apps unless you bind
+    them in Steam Input, so Grout can't use those either.
+
+Grout also bundles a current SDL controller database (`gamecontrollerdb.txt`)
+and points SDL at it, so newer controllers are recognized even when run outside
+Steam Input (e.g. in Desktop Mode). To customize the mapping yourself, drop a
+replacement at `Grout/overrides/cfw/esde/input_mappings/steam-input.json` in the
+port folder, or use the in-app **Input Mapping** wizard under *Settings →
+Advanced*.
 
 ## BIOS Files
 
