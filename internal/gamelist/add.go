@@ -130,13 +130,32 @@ func (gl *GameList) AddRomGame(entry RomGameEntry) {
 	gl.AdddOrUpdateEntry(entry.Game.Name, gameMetadata)
 }
 
-func AddRomGamesToGamelist(entry []RomGameEntry, gamelistFilename FileName) error {
+// Options customizes gamelist writing for CFWs whose layout differs from the
+// default <romdir>/<filename> convention (e.g. ES-DE keeps gamelists in its
+// appdata dir and records ROM paths relative to the system folder).
+type Options struct {
+	// GamelistPath returns the gamelist file to write for a ROM directory.
+	GamelistPath func(romDir string, filename FileName) string
+	// GamePath rewrites the path recorded for a game entry.
+	GamePath func(entry RomGameEntry) string
+}
+
+func AddRomGamesToGamelist(entry []RomGameEntry, gamelistFilename FileName, opts ...Options) error {
+	var opt Options
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+
 	gamelists := make(map[string]GameListEntry)
 	for _, game := range entry {
-		glEntry, exists := gamelists[game.Platform.FSSlug]
+		gamelistPath := fmt.Sprintf("%s/%s", game.RomDirectory, gamelistFilename)
+		if opt.GamelistPath != nil {
+			gamelistPath = opt.GamelistPath(game.RomDirectory, gamelistFilename)
+		}
+
+		glEntry, exists := gamelists[gamelistPath]
 		if !exists {
 			gl := New()
-			gamelistPath := fmt.Sprintf("%s/%s", game.RomDirectory, gamelistFilename)
 			if fileutil.FileExists(gamelistPath) {
 				data, err := os.ReadFile(gamelistPath)
 				if err != nil {
@@ -153,7 +172,11 @@ func AddRomGamesToGamelist(entry []RomGameEntry, gamelistFilename FileName) erro
 				}
 			}
 			glEntry = GameListEntry{Path: gamelistPath, GL: gl}
-			gamelists[game.Platform.FSSlug] = glEntry
+			gamelists[gamelistPath] = glEntry
+		}
+
+		if opt.GamePath != nil {
+			game.GamePath = opt.GamePath(game)
 		}
 
 		glEntry.GL.AddRomGame(game)

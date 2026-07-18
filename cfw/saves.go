@@ -4,6 +4,7 @@ import (
 	"grout/cfw/allium"
 	"grout/cfw/arkos"
 	"grout/cfw/batocera"
+	"grout/cfw/esde"
 	"grout/cfw/knulli"
 	"grout/cfw/koriki"
 	"grout/cfw/minui"
@@ -74,6 +75,8 @@ func EmulatorFolderMap(c CFW) map[string][]string {
 		return batocera.Platforms
 	case MinUI:
 		return minui.SaveDirectories
+	case ESDE:
+		return esde.SaveDirectories()
 	default:
 		return nil
 	}

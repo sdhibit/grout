@@ -6,6 +6,7 @@ import (
 	"grout/cfw"
 	"grout/cfw/allium"
 	"grout/cfw/arkos"
+	"grout/cfw/esde"
 	"grout/cfw/koriki"
 	"grout/cfw/minui"
 	"grout/cfw/muos"
@@ -30,6 +31,7 @@ import (
 	buttons "github.com/BrandonKowalski/gabagool/v2/pkg/gabagool/constants"
 	"github.com/BrandonKowalski/gabagool/v2/pkg/gabagool/i18n"
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
+	"github.com/veandco/go-sdl2/sdl"
 )
 
 type SetupResult struct {
@@ -46,6 +48,7 @@ func setup() SetupResult {
 	logger := gaba.GetLogger()
 
 	config, isFirstLaunch := loadOrCreateConfig(logger)
+	config = handleESDEVariant(config, currentCFW, logger)
 	config = handleFirstLaunch(config, isFirstLaunch, logger)
 	config = applyConfig(config, isFirstLaunch, currentCFW, logger)
 
@@ -113,8 +116,10 @@ func initFramework(currentCFW cfw.CFW) {
 		IsNextUI:             currentCFW == cfw.NextUI,
 		DisplayOrientation:   gaba.OrientationNormal,
 	}
-	if preConfig, err := internal.LoadConfig(); err == nil {
-		gaba.SetFlipFaceButtons(preConfig.SwapFaceButtons)
+	var preConfig *internal.Config
+	if c, err := internal.LoadConfig(); err == nil {
+		preConfig = c
+		gaba.SetFlipFaceButtons(c.SwapFaceButtons)
 	}
 	if currentCFW == cfw.Spruce && spruce.DetectDevice() == spruce.DeviceA30 {
 		gabaOptions.DisplayOrientation = gaba.OrientationRotate270
@@ -136,6 +141,15 @@ func initFramework(currentCFW cfw.CFW) {
 		}
 	}
 	gaba.Init(gabaOptions)
+
+	if currentCFW == cfw.ESDE {
+		// Steam Deck/Steam Input can emit continuous tiny analog-stick motion
+		// events, which flood SDL's event queue and make button input appear
+		// delayed or jittery. D-pad/buttons are sufficient for Grout
+		// navigation, so drop axis motion events.
+		sdl.EventState(sdl.CONTROLLERAXISMOTION, sdl.IGNORE)
+		sdl.EventState(sdl.JOYAXISMOTION, sdl.IGNORE)
+	}
 
 	gaba.RegisterChord("unlock-kid-mode", []buttons.VirtualButton{
 		buttons.VirtualButtonL1,
@@ -163,7 +177,41 @@ func initFramework(currentCFW cfw.CFW) {
 		log.Fatalf("Failed to initialize i18n: %v", err)
 	}
 
+	// On ES-DE the gamelist entry is deferred until the variant has been
+	// selected (handleESDEVariant) so it lands in the variant-correct appdata
+	// dir instead of creating ~/ES-DE on e.g. RetroDECK first-runs.
+	if currentCFW != cfw.ESDE || (preConfig != nil && preConfig.ESDE != nil) {
+		cfw.AddGroutToGamelist(currentCFW)
+	}
+}
+
+// handleESDEVariant shows the one-time ES-DE variant selection (vanilla /
+// EmuDeck / RetroDECK) when running on ES-DE without a stored choice. This
+// also covers configs that predate ES-DE support.
+func handleESDEVariant(config *internal.Config, currentCFW cfw.CFW, logger *slog.Logger) *internal.Config {
+	if currentCFW != cfw.ESDE || config.ESDE != nil {
+		return config
+	}
+
+	logger.Debug("No ES-DE variant configured, showing variant selection")
+	screen := ui.NewESDEVariantSelectionScreen()
+	variant, err := screen.Draw()
+	if err != nil {
+		logger.Error("ES-DE variant selection failed, defaulting to vanilla", "error", err)
+		variant = esde.VariantVanilla
+	}
+	logger.Debug("ES-DE variant selected", "variant", variant)
+
+	config.ESDE = &esde.Settings{Variant: variant}
+	if err := internal.SaveConfig(config); err != nil {
+		logger.Error("Failed to save config after ES-DE variant selection", "error", err)
+	}
+
+	// Now that paths resolve against the chosen variant, add the deferred
+	// ports gamelist entry.
 	cfw.AddGroutToGamelist(currentCFW)
+
+	return config
 }
 
 func loadOrCreateConfig(logger *slog.Logger) (*internal.Config, bool) {

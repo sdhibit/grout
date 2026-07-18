@@ -18,6 +18,9 @@ See [Collections Settings](#collections-settings) below.
 **Directory Mappings** - Change which device directories are mapped to which RomM platforms.
 See [Directory Mappings](#directory-mappings) below.
 
+**ES-DE Settings** *(ES-DE only)* - Switch between ES-DE variants (vanilla / EmuDeck / RetroDECK) and
+override individual directories. See [ES-DE Settings](#es-de-settings) below.
+
 **Save Sync** - Opens a sub-menu for configuring save sync. See [Save Sync Settings](#save-sync-settings) below.
 
 **Tools** - Opens a sub-menu for artwork management and parental controls. See [Tools](#tools) below.
@@ -154,6 +157,32 @@ For detailed documentation on platform mapping, see the [User Guide](guide.md#pl
 Each CFW uses different folder naming conventions:
 
 --8<-- "docs/_includes/mappings-reference.md"
+
+---
+
+## ES-DE Settings
+
+*(Only shown when running on ES-DE — vanilla, EmuDeck, or RetroDECK.)*
+
+### Variant
+
+Which ES-DE flavor you are running. This selects the default directory layout:
+
+- **ES-DE** - Standalone ES-DE. ROMs default to `~/ROMs`, gamelists and media to `~/ES-DE`.
+- **EmuDeck** - Directories under `~/Emulation` (or your custom EmuDeck install root, read from
+  EmuDeck's `settings.sh`), with media in `~/Emulation/tools/downloaded_media`.
+- **RetroDECK** - Directories under `~/retrodeck`, with relocated folders read from
+  RetroDECK's `retrodeck.json`.
+
+### Directory Overrides
+
+Each row shows the currently effective path. Select a row to edit it with the on-screen keyboard;
+clear the text to return to the variant default (or auto-discovered path).
+
+- **Base Path** - The install root (useful for SD-card installs).
+- **ROMs Directory**, **BIOS Directory**, **Saves Directory** - Individual content directories.
+- **ES-DE Data Directory** - Where ES-DE keeps `gamelists/` (and by default `downloaded_media/`).
+- **Media Directory** - The root of ES-DE's `downloaded_media` tree.
 
 ---
 

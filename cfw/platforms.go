@@ -4,6 +4,7 @@ import (
 	"grout/cfw/allium"
 	"grout/cfw/arkos"
 	"grout/cfw/batocera"
+	"grout/cfw/esde"
 	"grout/cfw/knulli"
 	"grout/cfw/koriki"
 	"grout/cfw/minui"
@@ -35,6 +36,7 @@ func buildPlatformAliasMap() map[string][]string {
 		arkos.Platforms,
 		batocera.Platforms,
 		minui.Platforms,
+		esde.Platforms,
 	}
 
 	// Build reverse map: primary folder -> list of RomM slugs that use it as primary
@@ -142,6 +144,8 @@ func GetPlatformMap(c CFW) map[string][]string {
 		return batocera.Platforms
 	case MinUI:
 		return minui.Platforms
+	case ESDE:
+		return esde.Platforms
 	default:
 		return nil
 	}

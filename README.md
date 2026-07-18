@@ -9,9 +9,9 @@
       A RomM Client for your retro doo-dad.
     </h3>
 
-[Allium][allium] · [ArkOS][arkos] · [Batocera][batocera] · [dArkOS][darkos] · [Knulli][knulli] · [Koriki][koriki] · [MinUI][minui]
+[Allium][allium] · [ArkOS][arkos] · [Batocera][batocera] · [dArkOS][darkos] · [EmuDeck][emudeck] · [ES-DE][esde] · [Knulli][knulli] · [Koriki][koriki] · [MinUI][minui]
 
-[muOS][muos] · [NextUI][nextui] · [Onion][onion] · [ROCKNIX][rocknix] · [Spruce][spruce] · [SprigUI][sprigui] · [TwigUI][twigui] · [TrimUI][trimui]
+[muOS][muos] · [NextUI][nextui] · [Onion][onion] · [RetroDECK][retrodeck] · [ROCKNIX][rocknix] · [Spruce][spruce] · [SprigUI][sprigui] · [TwigUI][twigui] · [TrimUI][trimui]
 
 <br>
 
@@ -92,6 +92,12 @@ If you enjoy using Grout and feel inclined to pay it forward, go do something ni
 [arkos]: https://github.com/christianhaitian/arkos
 [darkos]: https://github.com/christianhaitian/dArkOS
 [batocera]: https://batocera.org
+
+[emudeck]: https://www.emudeck.com
+
+[esde]: https://es-de.org
+
+[retrodeck]: https://retrodeck.net
 [knulli]: https://knulli.org
 [koriki]: https://github.com/Rparadise-Team/Koriki
 [minui]: https://github.com/shauninman/MinUI

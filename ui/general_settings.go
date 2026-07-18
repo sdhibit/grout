@@ -73,11 +73,15 @@ func (s *GeneralSettingsScreen) buildMenuItems(config *internal.Config) []gaba.I
 	displayDownloadArtPreview.Store(showArtKind.Load() && isMuOS)
 	displayEmulationStationOptions := atomic.Bool{}
 	displayEmulationStationOptions.Store(showArtKind.Load() && isESBasedOS)
+	// ES-DE has no bezel media type, so hide the bezel download option there.
+	displayBezelOption := atomic.Bool{}
+	displayBezelOption.Store(showArtKind.Load() && isESBasedOS && c != cfw.ESDE)
 
 	downloadArtUpdateFunc := func(val interface{}) {
 		showArtKind.Store(val.(bool))
 		displayDownloadArtPreview.Store(showArtKind.Load() && isMuOS)
 		displayEmulationStationOptions.Store(showArtKind.Load() && isESBasedOS)
+		displayBezelOption.Store(showArtKind.Load() && isESBasedOS && c != cfw.ESDE)
 	}
 
 	return []gaba.ItemWithOptions{
@@ -180,7 +184,7 @@ func (s *GeneralSettingsScreen) buildMenuItems(config *internal.Config) []gaba.I
 				{DisplayName: i18n.Localize(&goi18n.Message{ID: "common_false", Other: "False"}, nil), Value: false},
 			},
 			SelectedOption: boolToIndex(!config.AdditionalDownloads.Bezel),
-			VisibleWhen:    &displayEmulationStationOptions,
+			VisibleWhen:    &displayBezelOption,
 		},
 		{
 			Item: gaba.MenuItem{Text: i18n.Localize(&goi18n.Message{ID: "settings_download_emulationstation_art_manual", Other: "Download Game Manual"}, nil)},

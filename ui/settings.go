@@ -47,6 +47,7 @@ const (
 	SettingDirectoryMappings   SettingType = "directory_mappings"
 	SettingToolsSettings       SettingType = "tools_settings"
 	SettingAdvancedSettings    SettingType = "advanced_settings"
+	SettingESDESettings        SettingType = "esde_settings"
 	SettingInfo                SettingType = "info"
 	SettingCheckUpdates        SettingType = "check_updates"
 	SettingSaveSync            SettingType = "save_sync"
@@ -132,6 +133,11 @@ func (s *SettingsScreen) Draw(input SettingsInput) (SettingsOutput, error) {
 			return output, nil
 		}
 
+		if selectedText == i18n.Localize(&goi18n.Message{ID: "settings_esde", Other: "ES-DE Settings"}, nil) {
+			output.Action = SettingsActionESDE
+			return output, nil
+		}
+
 		if selectedText == i18n.Localize(&goi18n.Message{ID: "update_check_for_updates", Other: "Check for Updates"}, nil) {
 			output.CheckUpdatesClicked = true
 			output.Action = SettingsActionCheckUpdate
@@ -150,9 +156,14 @@ func (s *SettingsScreen) Draw(input SettingsInput) (SettingsOutput, error) {
 }
 
 func (s *SettingsScreen) buildMenuItems() []gaba.ItemWithOptions {
-	items := make([]gaba.ItemWithOptions, 0, len(settingsOrder))
+	items := make([]gaba.ItemWithOptions, 0, len(settingsOrder)+1)
 	for _, settingType := range settingsOrder {
 		items = append(items, s.buildMenuItem(settingType))
+		// ES-DE installs are configurable (variant + directories), so they get
+		// their own settings screen right after Directory Mappings.
+		if settingType == SettingDirectoryMappings && cfw.GetCFW() == cfw.ESDE {
+			items = append(items, s.buildMenuItem(SettingESDESettings))
+		}
 	}
 	return items
 }
@@ -186,6 +197,12 @@ func (s *SettingsScreen) buildMenuItem(settingType SettingType) gaba.ItemWithOpt
 	case SettingAdvancedSettings:
 		return gaba.ItemWithOptions{
 			Item:    gaba.MenuItem{Text: i18n.Localize(&goi18n.Message{ID: "settings_advanced", Other: "Advanced"}, nil)},
+			Options: []gaba.Option{{Type: gaba.OptionTypeClickable}},
+		}
+
+	case SettingESDESettings:
+		return gaba.ItemWithOptions{
+			Item:    gaba.MenuItem{Text: i18n.Localize(&goi18n.Message{ID: "settings_esde", Other: "ES-DE Settings"}, nil)},
 			Options: []gaba.Option{{Type: gaba.OptionTypeClickable}},
 		}
 

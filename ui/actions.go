@@ -76,6 +76,7 @@ const (
 	SettingsActionInfo
 	SettingsActionCheckUpdate
 	SettingsActionSaveSync
+	SettingsActionESDE
 	SettingsActionBack
 )
 

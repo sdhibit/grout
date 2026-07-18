@@ -448,7 +448,7 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 			if (config.DownloadSplashArt != artutil.ArtKindNone || config.AdditionalDownloads.Thumbnail != artutil.ArtKindNone) && artSplashDir != "" {
 				artSplashFileName := g.FsNameNoExt
 				isESBased := cfw.GetCFW().IsBasedOnEmulationStation()
-				if isESBased {
+				if cfw.GetCFW().UsesArtSuffixes() {
 					artSplashFileName += "-thumb.png"
 				} else {
 					artSplashFileName += ".png"
@@ -474,8 +474,8 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 			artMarqueeDir := config.GetArtMarqueeDirectory(gamePlatform)
 			if config.AdditionalDownloads.Marquee != artutil.ArtKindNone && artMarqueeDir != "" {
 				marqueeArtFileName := g.FsNameNoExt
-				// is cfw is ES based, use -marquee suffix to avoid conflicts with cover art
-				if cfw.GetCFW().IsBasedOnEmulationStation() {
+				// Batocera-style ES needs a -marquee suffix to avoid conflicts with cover art
+				if cfw.GetCFW().UsesArtSuffixes() {
 					marqueeArtFileName += "-marquee.png"
 				} else {
 					marqueeArtFileName += ".png"
@@ -544,8 +544,8 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 			boxbackDir := config.GetBoxbackDirectory(gamePlatform)
 			if config.AdditionalDownloads.BoxBack && boxbackDir != "" {
 				boxbackArtFileName := g.FsNameNoExt
-				// is cfw is ES based, use -boxback suffix to avoid conflicts with cover art
-				if cfw.GetCFW().IsBasedOnEmulationStation() {
+				// Batocera-style ES needs a -boxback suffix to avoid conflicts with cover art
+				if cfw.GetCFW().UsesArtSuffixes() {
 					boxbackArtFileName += "-boxback.png"
 				} else {
 					boxbackArtFileName += ".png"
@@ -565,8 +565,8 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 			fanartDir := config.GetFanartDirectory(gamePlatform)
 			if config.AdditionalDownloads.Fanart && fanartDir != "" {
 				fanartFileName := g.FsNameNoExt
-				// is cfw is ES based, use -fanart suffix to avoid conflicts with cover art
-				if cfw.GetCFW().IsBasedOnEmulationStation() {
+				// Batocera-style ES needs a -fanart suffix to avoid conflicts with cover art
+				if cfw.GetCFW().UsesArtSuffixes() {
 					fanartFileName += "-fanart.png"
 				} else {
 					fanartFileName += ".png"

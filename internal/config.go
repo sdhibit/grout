@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"grout/cache"
 	"grout/cfw"
+	"grout/cfw/esde"
 	"grout/internal/artutil"
 	"grout/romm"
 	"os"
@@ -75,6 +76,11 @@ type Config struct {
 	DownloadArtScreenshotPreview bool                        `json:"download_art_screenshot_preview,omitempty"`
 	DownloadSplashArt            artutil.ArtKind             `json:"download_splash_art,omitempty"`
 	AdditionalDownloads          AdditionalDownloads         `json:"additional_downloads,omitempty"`
+
+	// ESDE holds variant selection and directory overrides when running on
+	// ES-DE (vanilla / EmuDeck / RetroDECK). Nil until the first-run variant
+	// selection has completed.
+	ESDE *esde.Settings `json:"esde,omitempty"`
 
 	SwapFaceButtons       bool              `json:"swap_face_buttons,omitempty"`
 	PlatformOrder         []string          `json:"platform_order,omitempty"`
@@ -164,6 +170,9 @@ func LoadConfig() (*Config, error) {
 	// Load slot preferences from dedicated file
 	config.SlotPreferences = LoadSlotPreferences()
 
+	// Install ES-DE settings so cfw path resolution reflects this config.
+	esde.Configure(config.ESDE)
+
 	return &config, nil
 }
 
@@ -201,6 +210,10 @@ func SaveConfig(config *Config) error {
 	}
 
 	gaba.SetRawLogLevel(string(config.LogLevel))
+
+	// Re-install ES-DE settings so edits from the settings screens take effect
+	// immediately after saving.
+	esde.Configure(config.ESDE)
 
 	if err := i18n.SetWithCode(config.Language); err != nil {
 		gaba.GetLogger().Error("Failed to set language", "error", err, "language", config.Language)

@@ -1,6 +1,9 @@
 package gamelist
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/beevik/etree"
 )
 
@@ -103,9 +106,14 @@ func (gl *GameList) GameContainsElements(name string, elements []string) bool {
 	return true
 }
 
-func (gl *GameList) Save(filepath string) error {
+func (gl *GameList) Save(path string) error {
+	// Gamelist directories don't always exist yet (e.g. ES-DE keeps gamelists
+	// under its appdata dir rather than next to the ROMs).
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	gl.document.Indent(4)
-	if err := gl.document.WriteToFile(filepath); err != nil {
+	if err := gl.document.WriteToFile(path); err != nil {
 		return err
 	}
 	return nil

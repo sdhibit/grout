@@ -145,6 +145,11 @@ func registerScreens(r *router.Router, state *AppState) {
 		return screen.Draw(input.(ui.AdvancedSettingsInput))
 	})
 
+	r.Register(ScreenESDESettings, func(input any) (any, error) {
+		screen := ui.NewESDESettingsScreen()
+		return screen.Draw(input.(ui.ESDESettingsInput))
+	})
+
 	r.Register(ScreenPlatformMapping, func(input any) (any, error) {
 		screen := ui.NewPlatformMappingScreen()
 		return screen.Draw(input.(ui.PlatformMappingInput))

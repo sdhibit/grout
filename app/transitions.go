@@ -60,6 +60,8 @@ func buildTransitionFunc(state *AppState, quitOnBack bool, initialShowCollection
 			return transitionToolsSettings(ctx, result)
 		case ScreenAdvancedSettings:
 			return transitionAdvancedSettings(ctx, result)
+		case ScreenESDESettings:
+			return transitionESDESettings(ctx, result)
 		case ScreenPlatformMapping:
 			return transitionPlatformMapping(ctx, result)
 		case ScreenInfo:
@@ -633,6 +635,10 @@ func transitionSettings(ctx *transitionContext, result any) (router.Screen, any)
 		ctx.stack.Push(ScreenSettings, pushInput, r)
 		return ScreenAdvancedSettings, ui.AdvancedSettingsInput{Config: ctx.state.Config, Host: ctx.state.Host}
 
+	case ui.SettingsActionESDE:
+		ctx.stack.Push(ScreenSettings, pushInput, r)
+		return ScreenESDESettings, ui.ESDESettingsInput{Config: ctx.state.Config}
+
 	case ui.SettingsActionPlatformMapping:
 		ctx.stack.Push(ScreenSettings, pushInput, r)
 		return ScreenPlatformMapping, ui.PlatformMappingInput{
@@ -761,6 +767,14 @@ func transitionAdvancedSettings(ctx *transitionContext, result any) (router.Scre
 		}
 		return popOrExit(ctx.stack)
 	}
+}
+
+func transitionESDESettings(ctx *transitionContext, result any) (router.Screen, any) {
+	r := result.(ui.ESDESettingsOutput)
+	if r.Config != nil {
+		ctx.state.Config = r.Config
+	}
+	return popOrExit(ctx.stack)
 }
 
 func transitionServerAddress(ctx *transitionContext, result any) (router.Screen, any) {

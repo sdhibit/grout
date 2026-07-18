@@ -148,9 +148,13 @@ jobs:
       - name: Package Batocera AMD64
         run: task package:batocera-amd64
 
+      - name: Package ES-DE
+        run: task package:esde
+
       - name: Create distribution
         run: |
           cd dist/Batocera-amd64 && zip -r ../Grout-Batocera-amd64.zip Grout.sh Grout
+          cd ../ESDE && zip -r ../Grout-ESDE.zip Grout.sh Grout
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -158,6 +162,7 @@ jobs:
           name: amd64-artifacts
           path: |
             dist/Grout-Batocera-amd64.zip
+            dist/Grout-ESDE.zip
 
   build-x86:
     needs: prepare
@@ -315,6 +320,7 @@ jobs:
             **/Grout-Batocera-arm64.zip
             **/Grout-Batocera-x86.zip
             **/Grout-Batocera-amd64.zip
+            **/Grout-ESDE.zip
             **/grout
           draft: false
           prerelease: ${{ inputs.beta }}
@@ -394,6 +400,7 @@ jobs:
             "Grout-Batocera-arm64.zip"
             "Grout-Batocera-amd64.zip"
             "Grout-Batocera-x86.zip"
+            "Grout-ESDE.zip"
           )
 
           # Build the assets JSON object
