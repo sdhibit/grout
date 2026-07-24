@@ -21,6 +21,9 @@ See [Directory Mappings](#directory-mappings) below.
 **ES-DE Settings** *(ES-DE only)* - Switch between ES-DE variants (vanilla / EmuDeck / RetroDECK) and
 override individual directories. See [ES-DE Settings](#es-de-settings) below.
 
+**Add-on Folders** - Set where updates and DLC for consoles like the Switch are downloaded.
+See [Add-on Folders](#add-on-folders) below.
+
 **Save Sync** - Opens a sub-menu for configuring save sync. See [Save Sync Settings](#save-sync-settings) below.
 
 **Tools** - Opens a sub-menu for artwork management and parental controls. See [Tools](#tools) below.
@@ -183,6 +186,41 @@ clear the text to return to the variant default (or auto-discovered path).
 - **ROMs Directory**, **BIOS Directory**, **Saves Directory** - Individual content directories.
 - **ES-DE Data Directory** - Where ES-DE keeps `gamelists/` (and by default `downloaded_media/`).
 - **Media Directory** - The root of ES-DE's `downloaded_media` tree.
+
+---
+
+## Add-on Folders
+
+Modern consoles (Nintendo Switch, PS3, Vita, 3DS, Wii U, …) ship games as a **base
+game** plus optional **updates** and **DLC**. When your RomM library stores these in
+`update/` and `dlc/` subfolders, RomM tags each file's role and Grout treats the entry
+as one game rather than a flat list of files.
+
+### Downloading a multi-part game
+
+Open the game and press Download. If it has updates or DLC, Grout shows an **Add-on
+picker**:
+
+- The **base game always downloads**.
+- Each **update** and **DLC** is a checkbox, **pre-checked** — leave them to get
+  everything, or uncheck what you don't want.
+- **A** toggles an item, **L1**/**R1** select none/all, **Start** downloads.
+
+By default add-ons download into a category subfolder next to the base game
+(`<rom folder>/update/`, `<rom folder>/dlc/`).
+
+### Changing where updates/DLC land
+
+Some emulators watch a dedicated folder for updates/DLC so you don't have to install
+them to internal storage. The **Add-on Folders** screen lets you set **separate Updates
+and DLC folders** for each add-on-capable platform (Switch, PS3, Vita, 3DS, Wii U, …).
+
+Each row is **pre-filled with the current effective path**, derived from that platform's
+ROM directory (whatever your firmware uses — this is not tied to any particular
+firmware or emulator), so you edit a concrete path rather than a blank field. Adjust it
+with the on-screen keyboard (a leading `~` expands to your home directory) and save.
+Entering the default path or clearing the field restores the default, which keeps that
+folder tracking your ROM directory automatically.
 
 ---
 

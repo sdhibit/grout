@@ -39,4 +39,5 @@ const (
 	ScreenToolsSettings
 	ScreenInputMapping
 	ScreenESDESettings
+	ScreenAddonDirectories
 )

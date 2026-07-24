@@ -105,21 +105,123 @@ type RomMetadata struct {
 	AverageRating    float64  `json:"average_rating,omitempty"`
 }
 
+// RomFileCategory classifies an individual file within a multi-file ROM. It
+// mirrors RomM's server-side RomFileCategory enum; RomM assigns it by matching
+// the file's containing folder name (e.g. update/, dlc/) during scanning, and a
+// base-game file in the ROM's root has no category (empty string here).
+type RomFileCategory string
+
+const (
+	RomFileGame        RomFileCategory = "game"
+	RomFileDLC         RomFileCategory = "dlc"
+	RomFileUpdate      RomFileCategory = "update"
+	RomFilePatch       RomFileCategory = "patch"
+	RomFileHack        RomFileCategory = "hack"
+	RomFileMod         RomFileCategory = "mod"
+	RomFileTranslation RomFileCategory = "translation"
+	RomFileDemo        RomFileCategory = "demo"
+	RomFilePrototype   RomFileCategory = "prototype"
+	RomFileManual      RomFileCategory = "manual"
+	RomFileCheat       RomFileCategory = "cheat"
+	RomFileSoundtrack  RomFileCategory = "soundtrack"
+	RomFileScreenshot  RomFileCategory = "screenshot"
+)
+
+// IsBase reports whether the category represents the base game itself. RomM
+// leaves base-game files uncategorized (empty), and also has an explicit "game"
+// value; both mean "this is the game, not an add-on".
+func (c RomFileCategory) IsBase() bool {
+	return c == "" || c == RomFileGame
+}
+
+// IsGameContentAddon reports whether the category is downloadable add-on game
+// content the user chooses to apply on top of the base game (updates, DLC,
+// patches, etc.) — as opposed to auxiliary assets like manuals or soundtracks.
+func (c RomFileCategory) IsGameContentAddon() bool {
+	switch c {
+	case RomFileUpdate, RomFileDLC, RomFilePatch, RomFileHack, RomFileMod,
+		RomFileTranslation, RomFileDemo, RomFilePrototype:
+		return true
+	default:
+		return false
+	}
+}
+
 type RomFile struct {
-	ID            int       `json:"id,omitempty"`
-	RomID         int       `json:"rom_id,omitempty"`
-	FileName      string    `json:"file_name,omitempty"`
-	FilePath      string    `json:"file_path,omitempty"`
-	FileSizeBytes int64     `json:"file_size_bytes,omitempty"`
-	FullPath      string    `json:"full_path,omitempty"`
-	CreatedAt     time.Time `json:"created_at,omitempty"`
-	UpdatedAt     time.Time `json:"updated_at,omitempty"`
-	LastModified  time.Time `json:"last_modified,omitempty"`
-	CrcHash       string    `json:"crc_hash,omitempty"`
-	Md5Hash       string    `json:"md5_hash,omitempty"`
-	Sha1Hash      string    `json:"sha1_hash,omitempty"`
-	RAHash        string    `json:"ra_hash,omitempty"`
-	Category      any       `json:"category,omitempty"`
+	ID            int             `json:"id,omitempty"`
+	RomID         int             `json:"rom_id,omitempty"`
+	FileName      string          `json:"file_name,omitempty"`
+	FilePath      string          `json:"file_path,omitempty"`
+	FileSizeBytes int64           `json:"file_size_bytes,omitempty"`
+	FullPath      string          `json:"full_path,omitempty"`
+	CreatedAt     time.Time       `json:"created_at,omitempty"`
+	UpdatedAt     time.Time       `json:"updated_at,omitempty"`
+	LastModified  time.Time       `json:"last_modified,omitempty"`
+	CrcHash       string          `json:"crc_hash,omitempty"`
+	Md5Hash       string          `json:"md5_hash,omitempty"`
+	Sha1Hash      string          `json:"sha1_hash,omitempty"`
+	RAHash        string          `json:"ra_hash,omitempty"`
+	Category      RomFileCategory `json:"category,omitempty"`
+}
+
+// IsBase reports whether this file is a base-game file (vs an add-on).
+func (f RomFile) IsBase() bool {
+	return f.Category.IsBase()
+}
+
+// AddonGroup is a set of add-on files sharing a category, for presenting
+// selectable download options (e.g. all Updates together, all DLC together).
+type AddonGroup struct {
+	Category RomFileCategory
+	Files    []RomFile
+}
+
+// BaseFiles returns the base-game files (category empty or "game"). For a simple
+// single-file ROM this is just that file; for a categorized multi-part game
+// (e.g. a Switch title with update/ and dlc/ folders) it's the root files.
+func (r Rom) BaseFiles() []RomFile {
+	out := make([]RomFile, 0, len(r.Files))
+	for _, f := range r.Files {
+		if f.IsBase() {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// HasAddons reports whether the ROM has any game-content add-ons (updates, DLC,
+// patches, …). When true, the download flow should offer add-on selection
+// rather than treating every file as an interchangeable "version".
+func (r Rom) HasAddons() bool {
+	for _, f := range r.Files {
+		if f.Category.IsGameContentAddon() {
+			return true
+		}
+	}
+	return false
+}
+
+// AddonGroups returns the ROM's add-on files grouped by category in a stable
+// display order (updates, DLC, then other content types). Base files and
+// auxiliary files (manuals, soundtracks, screenshots, cheats) are excluded.
+func (r Rom) AddonGroups() []AddonGroup {
+	order := []RomFileCategory{
+		RomFileUpdate, RomFileDLC, RomFilePatch, RomFileHack,
+		RomFileMod, RomFileTranslation, RomFileDemo, RomFilePrototype,
+	}
+	byCat := make(map[RomFileCategory][]RomFile)
+	for _, f := range r.Files {
+		if f.Category.IsGameContentAddon() {
+			byCat[f.Category] = append(byCat[f.Category], f)
+		}
+	}
+	groups := make([]AddonGroup, 0, len(byCat))
+	for _, cat := range order {
+		if files := byCat[cat]; len(files) > 0 {
+			groups = append(groups, AddonGroup{Category: cat, Files: files})
+		}
+	}
+	return groups
 }
 
 type GetRomsQuery struct {

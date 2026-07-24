@@ -62,6 +62,8 @@ func buildTransitionFunc(state *AppState, quitOnBack bool, initialShowCollection
 			return transitionAdvancedSettings(ctx, result)
 		case ScreenESDESettings:
 			return transitionESDESettings(ctx, result)
+		case ScreenAddonDirectories:
+			return transitionAddonDirectories(ctx, result)
 		case ScreenPlatformMapping:
 			return transitionPlatformMapping(ctx, result)
 		case ScreenInfo:
@@ -639,6 +641,10 @@ func transitionSettings(ctx *transitionContext, result any) (router.Screen, any)
 		ctx.stack.Push(ScreenSettings, pushInput, r)
 		return ScreenESDESettings, ui.ESDESettingsInput{Config: ctx.state.Config}
 
+	case ui.SettingsActionAddonDirectories:
+		ctx.stack.Push(ScreenSettings, pushInput, r)
+		return ScreenAddonDirectories, ui.AddonDirectoriesInput{Config: ctx.state.Config, Platforms: ctx.state.Platforms}
+
 	case ui.SettingsActionPlatformMapping:
 		ctx.stack.Push(ScreenSettings, pushInput, r)
 		return ScreenPlatformMapping, ui.PlatformMappingInput{
@@ -771,6 +777,14 @@ func transitionAdvancedSettings(ctx *transitionContext, result any) (router.Scre
 
 func transitionESDESettings(ctx *transitionContext, result any) (router.Screen, any) {
 	r := result.(ui.ESDESettingsOutput)
+	if r.Config != nil {
+		ctx.state.Config = r.Config
+	}
+	return popOrExit(ctx.stack)
+}
+
+func transitionAddonDirectories(ctx *transitionContext, result any) (router.Screen, any) {
+	r := result.(ui.AddonDirectoriesOutput)
 	if r.Config != nil {
 		ctx.state.Config = r.Config
 	}

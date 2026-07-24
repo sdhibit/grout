@@ -30,13 +30,14 @@ import (
 )
 
 type DownloadInput struct {
-	Config         internal.Config
-	Host           romm.Host
-	Platform       romm.Platform
-	SelectedGames  []romm.Rom
-	AllGames       []romm.Rom
-	SearchFilter   string
-	SelectedFileID int
+	Config           internal.Config
+	Host             romm.Host
+	Platform         romm.Platform
+	SelectedGames    []romm.Rom
+	AllGames         []romm.Rom
+	SearchFilter     string
+	SelectedFileID   int
+	SelectedAddonIDs []int // add-on RomFile IDs to fetch alongside the base game (categorized multi-part ROMs)
 }
 
 type DownloadOutput struct {
@@ -59,15 +60,16 @@ func NewDownloadScreen() *DownloadScreen {
 	return &DownloadScreen{}
 }
 
-func (s *DownloadScreen) Execute(config internal.Config, host romm.Host, platform romm.Platform, selectedGames []romm.Rom, allGames []romm.Rom, searchFilter string, selectedFileID int) DownloadOutput {
+func (s *DownloadScreen) Execute(config internal.Config, host romm.Host, platform romm.Platform, selectedGames []romm.Rom, allGames []romm.Rom, searchFilter string, selectedFileID int, selectedAddonIDs []int) DownloadOutput {
 	result, err := s.draw(DownloadInput{
-		Config:         config,
-		Host:           host,
-		Platform:       platform,
-		SelectedGames:  selectedGames,
-		AllGames:       allGames,
-		SelectedFileID: selectedFileID,
-		SearchFilter:   searchFilter,
+		Config:           config,
+		Host:             host,
+		Platform:         platform,
+		SelectedGames:    selectedGames,
+		AllGames:         allGames,
+		SelectedFileID:   selectedFileID,
+		SelectedAddonIDs: selectedAddonIDs,
+		SearchFilter:     searchFilter,
 	})
 
 	if err != nil {
@@ -95,7 +97,7 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 		SearchFilter: input.SearchFilter,
 	}
 
-	downloads, artDownloads, gamelistEntries := s.buildDownloads(input.Config, input.Host, input.Platform, input.SelectedGames, input.SelectedFileID)
+	downloads, artDownloads, gamelistEntries := s.buildDownloads(input.Config, input.Host, input.Platform, input.SelectedGames, input.SelectedFileID, input.SelectedAddonIDs)
 
 	headers := make(map[string]string)
 	headers["Authorization"] = input.Host.AuthHeader()
@@ -348,10 +350,22 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 	return output, nil
 }
 
-func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, platform romm.Platform, games []romm.Rom, selectedFileID int) ([]gaba.Download, []artDownload, []gamelist.RomGameEntry) {
+// fileContentURL builds the RomM endpoint for downloading a single named file
+// from a ROM by its file ID.
+func fileContentURL(host romm.Host, romID int, fileName string, fileID int) string {
+	u, _ := url.JoinPath(host.URL(), "/api/roms/", strconv.Itoa(romID), "content", fileName)
+	return u + "?" + url.Values{"file_ids": {strconv.Itoa(fileID)}}.Encode()
+}
+
+func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, platform romm.Platform, games []romm.Rom, selectedFileID int, selectedAddonIDs []int) ([]gaba.Download, []artDownload, []gamelist.RomGameEntry) {
 	downloads := make([]gaba.Download, 0, len(games))
 	artDownloads := make([]artDownload, 0, len(games))
 	gamesSummaries := make([]gamelist.RomGameEntry, 0, len(games))
+
+	addonIDSet := make(map[int]bool, len(selectedAddonIDs))
+	for _, id := range selectedAddonIDs {
+		addonIDSet[id] = true
+	}
 
 	for _, g := range games {
 		gamelistRomEntry := gamelist.RomGameEntry{
@@ -373,7 +387,39 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 
 		sourceURL := ""
 
-		if g.HasMultipleFiles {
+		// extraDownloads holds add-on files (updates, DLC, …) for a categorized
+		// multi-part ROM. The base file is handled via downloadLocation/sourceURL
+		// below so it keeps the game's artwork and gamelist entry.
+		var extraDownloads []gaba.Download
+		if g.HasAddons() {
+			// A configured per-platform, per-category add-on directory (e.g. a
+			// Switch emulator's watched update/DLC folders) overrides the default
+			// category subfolder placement.
+			plan := planRomDownloads(g, addonIDSet, romDirectory, func(cat romm.RomFileCategory) string {
+				return config.AddonDestination(gamePlatform, cat)
+			})
+			var base *plannedDownload
+			for i := range plan {
+				if plan[i].IsBase {
+					if base == nil {
+						base = &plan[i]
+					}
+					continue
+				}
+				extraDownloads = append(extraDownloads, gaba.Download{
+					URL:         fileContentURL(host, g.ID, plan[i].FileName, plan[i].FileID),
+					Location:    plan[i].Location,
+					DisplayName: fmt.Sprintf("%s – %s", g.Name, plan[i].FileName),
+					Timeout:     config.DownloadTimeout.Duration(),
+				})
+			}
+			if base == nil {
+				gaba.GetLogger().Warn("Categorized ROM has no base file; skipping", "game", g.Name, "id", g.ID)
+				continue
+			}
+			downloadLocation = base.Location
+			sourceURL = fileContentURL(host, g.ID, base.FileName, base.FileID)
+		} else if g.HasMultipleFiles {
 			tmpDir := fileutil.TempDir()
 			downloadLocation = filepath.Join(tmpDir, fmt.Sprintf("grout_multirom_%d.zip", g.ID))
 			sourceURL, _ = url.JoinPath(host.URL(), "/api/roms/", strconv.Itoa(g.ID), "content", g.FsName)
@@ -409,6 +455,9 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 			DisplayName: g.Name,
 			Timeout:     config.DownloadTimeout.Duration(),
 		})
+		// Queue the selected add-on files (they share the base game's artwork
+		// and gamelist entry, so no extra art/metadata handling is needed).
+		downloads = append(downloads, extraDownloads...)
 
 		if config.DownloadArt && (g.PathCoverLarge != "" || g.PathCoverSmall != "" || g.URLCover != "") {
 			// Prepare download for cover art

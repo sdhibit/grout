@@ -73,6 +73,7 @@ const (
 	SettingsActionAdvanced
 	SettingsActionTools
 	SettingsActionPlatformMapping
+	SettingsActionAddonDirectories
 	SettingsActionInfo
 	SettingsActionCheckUpdate
 	SettingsActionSaveSync

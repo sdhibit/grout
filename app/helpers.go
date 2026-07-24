@@ -45,13 +45,30 @@ func executeDownloadUI(state *AppState, r ui.GameDetailsOutput, stack *router.St
 		}
 	}
 
+	// For a categorized multi-part game (updates/DLC), let the user pick which
+	// add-ons to download alongside the base game before starting.
+	var selectedAddonIDs []int
+	if r.Game.HasAddons() {
+		res, err := ui.NewAddonSelectionScreen().Draw(r.Game)
+		if err != nil {
+			gaba.GetLogger().Error("Add-on selection failed", "error", err)
+			return
+		}
+		if !res.Confirmed {
+			return
+		}
+		selectedAddonIDs = res.SelectedFileIDs
+	}
+
 	downloadScreen := ui.NewDownloadScreen()
-	downloadScreen.Execute(*state.Config, state.Host, r.Platform, []romm.Rom{r.Game}, allGames, searchFilter, r.SelectedFileID)
+	downloadScreen.Execute(*state.Config, state.Host, r.Platform, []romm.Rom{r.Game}, allGames, searchFilter, r.SelectedFileID, selectedAddonIDs)
 }
 
 func executeMultiDownloadUI(state *AppState, r ui.GameListOutput) {
+	// Bulk download from the games list grabs base games only; add-on selection
+	// is offered from a game's detail screen.
 	downloadScreen := ui.NewDownloadScreen()
-	downloadScreen.Execute(*state.Config, state.Host, r.Platform, r.SelectedGames, r.AllGames, r.SearchFilter, 0)
+	downloadScreen.Execute(*state.Config, state.Host, r.Platform, r.SelectedGames, r.AllGames, r.SearchFilter, 0, nil)
 }
 
 func handlePlatformMappingUpdateUI(state *AppState, r ui.PlatformMappingOutput) {

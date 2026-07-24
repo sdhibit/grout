@@ -9,6 +9,8 @@ import (
 	"grout/internal/artutil"
 	"grout/romm"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -81,6 +83,13 @@ type Config struct {
 	// ES-DE (vanilla / EmuDeck / RetroDECK). Nil until the first-run variant
 	// selection has completed.
 	ESDE *esde.Settings `json:"esde,omitempty"`
+
+	// AddonDirectoryMappings maps a platform fs_slug to per-category add-on
+	// destination overrides (category value, e.g. "update"/"dlc" -> directory).
+	// A category left unset uses the default: a subfolder named after the
+	// category under the platform's ROM directory. Used mainly for consoles like
+	// the Switch whose emulators watch dedicated update/DLC folders.
+	AddonDirectoryMappings map[string]map[string]string `json:"addon_directory_mappings,omitempty"`
 
 	SwapFaceButtons       bool              `json:"swap_face_buttons,omitempty"`
 	PlatformOrder         []string          `json:"platform_order,omitempty"`
@@ -368,6 +377,31 @@ func (c Config) ResolveRommFSSlug(cfwKey string) string {
 		}
 	}
 	return cfwKey
+}
+
+// expandHomeDir expands a leading ~ in a path to the user's home directory.
+func expandHomeDir(path string) string {
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			if path == "~" {
+				return home
+			}
+			return filepath.Join(home, path[2:])
+		}
+	}
+	return path
+}
+
+// AddonDestination returns the configured directory for a platform's files of a
+// given add-on category (e.g. update, dlc), with a leading ~ expanded. An empty
+// result means that category uses its default: a subfolder named after the
+// category under the platform's ROM directory.
+func (c Config) AddonDestination(platform romm.Platform, category romm.RomFileCategory) string {
+	byCat := c.AddonDirectoryMappings[platform.FSSlug]
+	if byCat == nil {
+		return ""
+	}
+	return expandHomeDir(byCat[string(category)])
 }
 
 func (c Config) GetPlatformRomDirectory(platform romm.Platform) string {
