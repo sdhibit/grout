@@ -40,4 +40,5 @@ const (
 	ScreenInputMapping
 	ScreenESDESettings
 	ScreenAddonDirectories
+	ScreenAddonPlatform
 )

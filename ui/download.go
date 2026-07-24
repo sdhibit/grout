@@ -396,7 +396,7 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 			// Switch emulator's watched update/DLC folders) overrides the default
 			// category subfolder placement.
 			plan := planRomDownloads(g, addonIDSet, romDirectory, func(cat romm.RomFileCategory) string {
-				return config.AddonDestination(gamePlatform, cat)
+				return config.AddonDestination(gamePlatform, cat, romDirectory)
 			})
 			var base *plannedDownload
 			for i := range plan {

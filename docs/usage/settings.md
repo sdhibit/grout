@@ -212,15 +212,25 @@ By default add-ons download into a category subfolder next to the base game
 ### Changing where updates/DLC land
 
 Some emulators watch a dedicated folder for updates/DLC so you don't have to install
-them to internal storage. The **Add-on Folders** screen lets you set **separate Updates
-and DLC folders** for each add-on-capable platform (Switch, PS3, Vita, 3DS, Wii U, …).
+them to internal storage. The **Add-on Folders** screen lists each add-on-capable
+platform (Switch, PS3, Vita, 3DS, Wii U, …) — much like Directory Mappings. Select a
+platform to open **its own screen**, where each system gets its own area to configure:
 
-Each row is **pre-filled with the current effective path**, derived from that platform's
-ROM directory (whatever your firmware uses — this is not tied to any particular
-firmware or emulator), so you edit a concrete path rather than a blank field. Adjust it
-with the on-screen keyboard (a leading `~` expands to your home directory) and save.
-Entering the default path or clearing the field restores the default, which keeps that
-folder tracking your ROM directory automatically.
+- **Base Folder** — the root the category folders live under. Pre-filled with that
+  platform's ROM directory (whatever your firmware uses — this is not tied to any
+  particular firmware or emulator). Edit it with the on-screen keyboard; a leading `~`
+  expands to your home directory. Clearing it or matching the ROM directory keeps the
+  base tracking your ROMs automatically.
+- **A folder per add-on category** (Update, DLC, Patch, Hack, Mod, Translation, Demo,
+  Prototype) — a subfolder **relative to the Base Folder**, exactly like a platform maps
+  to `/gb` or `/gba`. Each defaults to the category name (`update`, `dlc`, …). Change it
+  to a custom subfolder, or **clear it** to drop that category's files directly into the
+  Base Folder (shown as `(base folder)`).
+
+So a Switch update lands at `<Base Folder>/<Update subfolder>/…` — for example
+`~/Emulation/roms/switch/update/…` by default, or a custom emulator folder if you set
+one. Any value left at its default is not stored, so folders keep tracking your ROM
+directory as it changes.
 
 ---
 

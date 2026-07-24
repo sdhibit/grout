@@ -155,6 +155,11 @@ func registerScreens(r *router.Router, state *AppState) {
 		return screen.Draw(input.(ui.AddonDirectoriesInput))
 	})
 
+	r.Register(ScreenAddonPlatform, func(input any) (any, error) {
+		screen := ui.NewAddonPlatformScreen()
+		return screen.Draw(input.(ui.AddonPlatformInput))
+	})
+
 	r.Register(ScreenPlatformMapping, func(input any) (any, error) {
 		screen := ui.NewPlatformMappingScreen()
 		return screen.Draw(input.(ui.PlatformMappingInput))
