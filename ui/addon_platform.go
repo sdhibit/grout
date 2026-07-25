@@ -13,17 +13,15 @@ import (
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
-// addonGameContentCategories are the add-on categories offered as configurable
-// subfolder rows on a platform's add-on screen, in display order.
+// addonGameContentCategories are the supplemental add-on categories offered as
+// configurable subfolder rows on a platform's add-on screen, in display order.
+// Only content layered on top of the base game (updates, DLC, patches) is placed
+// via these mappings; standalone alternate builds (hacks, prototypes, …) are
+// downloaded as selectable versions into the ROM directory, not as add-ons.
 var addonGameContentCategories = []romm.RomFileCategory{
 	romm.RomFileUpdate,
 	romm.RomFileDLC,
 	romm.RomFilePatch,
-	romm.RomFileHack,
-	romm.RomFileMod,
-	romm.RomFileTranslation,
-	romm.RomFileDemo,
-	romm.RomFilePrototype,
 }
 
 // addonBaseRowKey marks the Base Folder row's metadata (vs a category value).
@@ -44,10 +42,12 @@ func NewAddonPlatformScreen() *AddonPlatformScreen {
 	return &AddonPlatformScreen{}
 }
 
-// Draw configures where one platform's add-ons are downloaded: a Base Folder
-// (default: the platform's ROM directory) plus, per add-on category, a subfolder
-// relative to that base. Clearing a category's subfolder places its files
-// directly in the base folder. Mirrors the platform directory-mapping screen.
+// Draw configures where one platform's add-ons are downloaded, mirroring the Rom
+// Directory Mapping screen's cycle interaction. The Base Folder row cycles between
+// the platform's ROM directory (default) and a Custom path. Each add-on category
+// row cycles Skip / default-subfolder / Custom: Skip places the files directly in
+// the base folder, the default is a subfolder named after the category, and Custom
+// is any other subfolder relative to the base.
 func (s *AddonPlatformScreen) Draw(input AddonPlatformInput) (AddonPlatformOutput, error) {
 	config := input.Config
 	output := AddonPlatformOutput{Config: config}
@@ -55,47 +55,82 @@ func (s *AddonPlatformScreen) Draw(input AddonPlatformInput) (AddonPlatformOutpu
 	romDir := config.GetPlatformRomDirectory(input.Platform)
 	mapping := config.AddonDirectoryMappings[input.Platform.FSSlug]
 
-	base := romDir
-	if mapping.BaseDir != "" {
-		base = mapping.BaseDir
-	}
+	customLabel := i18n.Localize(&goi18n.Message{ID: "platform_mapping_custom", Other: "Custom..."}, nil)
 
+	// Base Folder: a default (the platform's ROM directory) / Custom cycle. There
+	// is no Skip here — the platform's add-ons must resolve to some root folder.
+	baseSelected := 0
+	baseCustom := ""
+	if mapping.BaseDir != "" && mapping.BaseDir != romDir {
+		baseSelected = 1
+		baseCustom = mapping.BaseDir
+	}
+	baseCustomDisplay := customLabel
+	if baseCustom != "" {
+		baseCustomDisplay = baseCustom
+	}
 	items := []gaba.ItemWithOptions{
 		{
 			Item: gaba.MenuItem{
 				Text:     i18n.Localize(&goi18n.Message{ID: "addon_base_folder", Other: "Base Folder"}, nil),
 				Metadata: addonBaseRowKey,
 			},
-			Options: []gaba.Option{{
-				Type:           gaba.OptionTypeKeyboard,
-				DisplayName:    base,
-				KeyboardPrompt: base,
-				Value:          base,
-			}},
+			Options: []gaba.Option{
+				{DisplayName: romDir, Value: romDir},
+				{
+					Type:           gaba.OptionTypeKeyboard,
+					DisplayName:    baseCustomDisplay,
+					KeyboardPrompt: baseCustom,
+					Value:          baseCustom,
+				},
+			},
+			SelectedOption: baseSelected,
 		},
 	}
 
-	baseFolderLabel := i18n.Localize(&goi18n.Message{ID: "addon_subfolder_base", Other: "(base folder)"}, nil)
+	// Each add-on category: a Skip / default-subfolder / Custom cycle, mirroring
+	// the Rom Directory Mapping screen. Skip places the files in the base folder
+	// (stored as an empty subfolder), the default is a subfolder named after the
+	// category, and Custom takes any other subfolder relative to the base.
+	skipLabel := i18n.Localize(&goi18n.Message{ID: "common_skip", Other: "Skip"}, nil)
 	for _, cat := range addonGameContentCategories {
-		sub := string(cat) // default subfolder = the category name
-		if v, present := mapping.Categories[string(cat)]; present {
-			sub = v
+		defaultSub := string(cat)
+		defaultDisplay := i18n.Localize(&goi18n.Message{ID: "platform_mapping_path_prefix", Other: "/{{.Name}}"}, map[string]interface{}{"Name": defaultSub})
+
+		selected := 1 // default subfolder
+		custom := ""
+		if v, present := mapping.Categories[defaultSub]; present {
+			switch v {
+			case "":
+				selected = 0 // Skip -> base folder
+			case defaultSub:
+				selected = 1
+			default:
+				selected = 2 // custom subfolder
+				custom = v
+			}
 		}
-		display := sub
-		if display == "" {
-			display = baseFolderLabel
+		customDisplay := customLabel
+		if custom != "" {
+			customDisplay = custom
 		}
+
 		items = append(items, gaba.ItemWithOptions{
 			Item: gaba.MenuItem{
 				Text:     addonCategoryLabel(cat),
-				Metadata: string(cat),
+				Metadata: defaultSub,
 			},
-			Options: []gaba.Option{{
-				Type:           gaba.OptionTypeKeyboard,
-				DisplayName:    display,
-				KeyboardPrompt: sub,
-				Value:          sub,
-			}},
+			Options: []gaba.Option{
+				{DisplayName: skipLabel, Value: ""},
+				{DisplayName: defaultDisplay, Value: defaultSub},
+				{
+					Type:           gaba.OptionTypeKeyboard,
+					DisplayName:    customDisplay,
+					KeyboardPrompt: custom,
+					Value:          custom,
+				},
+			},
+			SelectedOption: selected,
 		})
 	}
 
@@ -108,8 +143,9 @@ func (s *AddonPlatformScreen) Draw(input AddonPlatformInput) (AddonPlatformOutpu
 				{ButtonName: icons.LeftRight, HelpText: i18n.Localize(&goi18n.Message{ID: "button_cycle", Other: "Cycle"}, nil)},
 				FooterSave(),
 			},
-			StatusBar:     StatusBar(),
-			UseSmallTitle: true,
+			StatusBar:        StatusBar(),
+			UseSmallTitle:    true,
+			ListPickerButton: icons.VirtualButtonA,
 		},
 		items,
 	)

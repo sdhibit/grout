@@ -214,18 +214,24 @@ By default add-ons download into a category subfolder next to the base game
 Some emulators watch a dedicated folder for updates/DLC so you don't have to install
 them to internal storage. The **Add-on Folders** screen lists each add-on-capable
 platform (Switch, PS3, Vita, 3DS, Wii U, …) — much like Directory Mappings. Select a
-platform to open **its own screen**, where each system gets its own area to configure:
+platform to open **its own screen**, where each row is a left/right **cycle** just like
+Rom Directory Mapping (press **A** to pick from the list instead):
 
-- **Base Folder** — the root the category folders live under. Pre-filled with that
-  platform's ROM directory (whatever your firmware uses — this is not tied to any
-  particular firmware or emulator). Edit it with the on-screen keyboard; a leading `~`
-  expands to your home directory. Clearing it or matching the ROM directory keeps the
-  base tracking your ROMs automatically.
-- **A folder per add-on category** (Update, DLC, Patch, Hack, Mod, Translation, Demo,
-  Prototype) — a subfolder **relative to the Base Folder**, exactly like a platform maps
-  to `/gb` or `/gba`. Each defaults to the category name (`update`, `dlc`, …). Change it
-  to a custom subfolder, or **clear it** to drop that category's files directly into the
-  Base Folder (shown as `(base folder)`).
+- **Base Folder** — the root the category folders live under. Cycles between the
+  platform's **ROM directory** (default, pre-filled from whatever your firmware uses —
+  this is not tied to any particular firmware or emulator) and **Custom…**, which opens
+  the on-screen keyboard. A leading `~` expands to your home directory. Left at the ROM
+  directory, the base tracks your ROMs automatically.
+- **A row per supplemental add-on category** (Update, DLC, Patch) — each cycles
+  **Skip / default-subfolder / Custom…**, exactly like a platform maps to
+  Skip / `/gb` / Custom. (Standalone alternate builds such as hacks and prototypes are
+  not add-ons — they're offered as selectable **versions** on the game screen and
+  download straight into the ROM folder.)
+  - **Skip** — drop that category's files directly into the Base Folder (no dedicated
+    subfolder). The files still download; they just aren't foldered separately.
+  - **default** — a subfolder named after the category (`/update`, `/dlc`, …),
+    relative to the Base Folder.
+  - **Custom…** — any other subfolder relative to the Base Folder.
 
 So a Switch update lands at `<Base Folder>/<Update subfolder>/…` — for example
 `~/Emulation/roms/switch/update/…` by default, or a custom emulator folder if you set
