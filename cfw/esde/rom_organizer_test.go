@@ -3,7 +3,6 @@ package esde
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -24,6 +23,15 @@ func mkExtract(t *testing.T, gameName string, files map[string]string) string {
 	return romDir
 }
 
+func isDir(t *testing.T, path string) bool {
+	t.Helper()
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat %s: %v", path, err)
+	}
+	return fi.IsDir()
+}
+
 func TestSupportsM3U(t *testing.T) {
 	if !SupportsM3U("psx") {
 		t.Error("psx (DuckStation/RetroArch) should support .m3u")
@@ -33,7 +41,9 @@ func TestSupportsM3U(t *testing.T) {
 	}
 }
 
-func TestOrganizeM3UHidesDiscsAndRewritesPlaylist(t *testing.T) {
+// m3u-capable system: the directory is interpreted as the <game>.m3u file, with
+// every disc kept inside it.
+func TestInterpretsDirectoryAsM3U(t *testing.T) {
 	game := "Final Fantasy VII"
 	romDir := mkExtract(t, game, map[string]string{
 		game + ".m3u":                    "Final Fantasy VII (Disc 1).chd\nFinal Fantasy VII (Disc 2).chd\n",
@@ -46,37 +56,55 @@ func TestOrganizeM3UHidesDiscsAndRewritesPlaylist(t *testing.T) {
 		t.Fatalf("organize failed: %v", err)
 	}
 
-	rootM3U := filepath.Join(romDir, game+".m3u")
-	if gamePath != rootM3U {
-		t.Errorf("returned game path = %q, want %q", gamePath, rootM3U)
+	wantDir := filepath.Join(romDir, game+".m3u")
+	if gamePath != wantDir {
+		t.Errorf("returned game path = %q, want %q", gamePath, wantDir)
 	}
-	content, err := os.ReadFile(rootM3U)
-	if err != nil {
-		t.Fatalf("root .m3u missing: %v", err)
+	if !isDir(t, wantDir) {
+		t.Error("interpreted entry should be a directory")
 	}
-	got := strings.TrimSpace(string(content))
-	want := ".Final Fantasy VII/Final Fantasy VII (Disc 1).chd\n.Final Fantasy VII/Final Fantasy VII (Disc 2).chd"
-	if got != want {
-		t.Errorf("m3u content =\n%q\nwant\n%q", got, want)
-	}
-
-	hiddenDir := filepath.Join(romDir, "."+game)
-	for _, disc := range []string{"Final Fantasy VII (Disc 1).chd", "Final Fantasy VII (Disc 2).chd"} {
-		if _, err := os.Stat(filepath.Join(hiddenDir, disc)); err != nil {
-			t.Errorf("disc %q not in hidden dir: %v", disc, err)
+	// The matching inner file (what ES-DE launches) and both discs live inside.
+	for _, inner := range []string{game + ".m3u", "Final Fantasy VII (Disc 1).chd", "Final Fantasy VII (Disc 2).chd"} {
+		if _, err := os.Stat(filepath.Join(wantDir, inner)); err != nil {
+			t.Errorf("expected %q inside interpreted dir: %v", inner, err)
 		}
 	}
 	if _, err := os.Stat(filepath.Join(romDir, game)); !os.IsNotExist(err) {
-		t.Errorf("extract dir should be gone, stat err = %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(hiddenDir, game+".m3u")); !os.IsNotExist(err) {
-		t.Error("original in-dir .m3u should have been removed")
+		t.Errorf("original extract dir should be gone, stat err = %v", err)
 	}
 }
 
-// PS2/PCSX2 can't load an .m3u, so the primary disc (disc 1 per the playlist) is
-// promoted to the system root as the single launchable entry and the rest hidden.
-func TestOrganizeNoM3USupportPromotesPrimaryDisc(t *testing.T) {
+// A playlist not already named after the game is renamed so the directory name
+// stays clean.
+func TestInterpretsDirectoryAsM3URenamesPlaylist(t *testing.T) {
+	game := "Chrono Cross"
+	romDir := mkExtract(t, game, map[string]string{
+		"playlist.m3u":              "Chrono Cross (Disc 1).chd\nChrono Cross (Disc 2).chd\n",
+		"Chrono Cross (Disc 1).chd": "d1",
+		"Chrono Cross (Disc 2).chd": "d2",
+	})
+
+	gamePath, err := OrganizeMultiFileRom(filepath.Join(romDir, game), romDir, game, true)
+	if err != nil {
+		t.Fatalf("organize failed: %v", err)
+	}
+
+	wantDir := filepath.Join(romDir, game+".m3u")
+	if gamePath != wantDir {
+		t.Errorf("returned game path = %q, want %q", gamePath, wantDir)
+	}
+	if _, err := os.Stat(filepath.Join(wantDir, game+".m3u")); err != nil {
+		t.Errorf("playlist should have been renamed to %q: %v", game+".m3u", err)
+	}
+	if _, err := os.Stat(filepath.Join(wantDir, "playlist.m3u")); !os.IsNotExist(err) {
+		t.Error("original playlist name should be gone")
+	}
+}
+
+// PS2/PCSX2 can't load an .m3u, so the directory is interpreted as the primary
+// disc (disc 1 per the playlist), which ES-DE launches; the other discs stay
+// inside for in-emulator swapping.
+func TestInterpretsDirectoryAsPrimaryDisc(t *testing.T) {
 	game := "Final Fantasy X"
 	romDir := mkExtract(t, game, map[string]string{
 		game + ".m3u":                  "Final Fantasy X (Disc 1).chd\nFinal Fantasy X (Disc 2).chd\n",
@@ -89,33 +117,25 @@ func TestOrganizeNoM3USupportPromotesPrimaryDisc(t *testing.T) {
 		t.Fatalf("organize failed: %v", err)
 	}
 
-	wantPrimary := filepath.Join(romDir, "Final Fantasy X (Disc 1).chd")
-	if gamePath != wantPrimary {
-		t.Errorf("returned game path = %q, want %q", gamePath, wantPrimary)
+	wantDir := filepath.Join(romDir, "Final Fantasy X (Disc 1).chd")
+	if gamePath != wantDir {
+		t.Errorf("returned game path = %q, want %q", gamePath, wantDir)
 	}
-	if _, err := os.Stat(wantPrimary); err != nil {
-		t.Errorf("primary disc not promoted to root: %v", err)
+	if !isDir(t, wantDir) {
+		t.Error("interpreted entry should be a directory")
 	}
-
-	// No playlist should remain in the system root (PCSX2 can't use it).
-	if _, err := os.Stat(filepath.Join(romDir, game+".m3u")); !os.IsNotExist(err) {
-		t.Error("no root .m3u expected for a non-m3u system")
-	}
-
-	// The second disc and the (unusable) playlist are hidden.
-	hiddenDir := filepath.Join(romDir, "."+game)
-	if _, err := os.Stat(filepath.Join(hiddenDir, "Final Fantasy X (Disc 2).chd")); err != nil {
-		t.Errorf("disc 2 should be hidden: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(hiddenDir, game+".m3u")); err != nil {
-		t.Errorf("unusable .m3u should be hidden: %v", err)
+	// The launch file (matching the dir name) and the other disc are both inside.
+	for _, inner := range []string{"Final Fantasy X (Disc 1).chd", "Final Fantasy X (Disc 2).chd"} {
+		if _, err := os.Stat(filepath.Join(wantDir, inner)); err != nil {
+			t.Errorf("expected %q inside interpreted dir: %v", inner, err)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(romDir, game)); !os.IsNotExist(err) {
-		t.Errorf("extract dir should be gone, stat err = %v", err)
+		t.Errorf("original extract dir should be gone, stat err = %v", err)
 	}
 }
 
-func TestOrganizeNoDiscsHidesWholeDir(t *testing.T) {
+func TestNoLaunchableFileHidesDir(t *testing.T) {
 	game := "Weird Game"
 	romDir := mkExtract(t, game, map[string]string{}) // empty extract dir
 

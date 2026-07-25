@@ -201,9 +201,10 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 						return nil, err
 					}
 				} else if cfw.GetCFW() == cfw.ESDE {
-					// ES-DE scans every file in the system directory, so hide the disc
-					// images in a dot-prefixed folder and expose a single launchable
-					// entry — one game instead of one per disc.
+					// ES-DE scans every file in the system directory, so turn the
+					// extracted folder into a single "directory interpreted as a file"
+					// — one game entry that launches the right inner file (a playlist,
+					// or the primary disc for PS2/PCSX2, which can't use .m3u).
 					p, err := esde.OrganizeMultiFileRom(extractDir, romDirectory, g.FsNameNoExt, esde.SupportsM3U(gamePlatform.FSSlug))
 					if err != nil {
 						logger.Error("Failed to organize multi-file ROM for ES-DE", "game", g.FsNameNoExt, "error", err)
