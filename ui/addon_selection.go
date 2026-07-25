@@ -92,7 +92,10 @@ func (s *AddonSelectionScreen) Draw(game romm.Rom) (AddonSelectionResult, error)
 	)
 	options.UseSmallTitle = true
 	options.InitialMultiSelectMode = true
-	options.MultiSelectButton = gabaconst.VirtualButtonA
+	// A toggles the highlighted item's checkbox (gabagool's built-in multi-select
+	// toggle). We deliberately do NOT bind MultiSelectButton to A: that button
+	// toggles multi-select *mode* off, which clears every checkbox and drops the
+	// list out of multi-select on the first A press.
 	options.MultiSelectConfirmButton = gabaconst.VirtualButtonStart
 	options.SelectAllButton = gabaconst.VirtualButtonR1
 	options.DeselectAllButton = gabaconst.VirtualButtonL1

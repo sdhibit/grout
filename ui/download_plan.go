@@ -43,7 +43,7 @@ func planRomDownloads(
 				Location: filepath.Join(romDir, f.FileName),
 				IsBase:   true,
 			})
-		case f.Category.IsGameContentAddon() && selectedAddons[f.ID]:
+		case f.Category.IsSupplementalAddon() && selectedAddons[f.ID]:
 			dest := filepath.Join(romDir, string(f.Category))
 			if addonDestFor != nil {
 				if override := addonDestFor(f.Category); override != "" {

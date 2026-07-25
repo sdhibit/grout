@@ -54,7 +54,10 @@ func (s *GameDetailsScreen) Draw(input GameDetailsInput) (GameDetailsOutput, err
 		Platform: input.Platform,
 	}
 
-	hasMultipleFiles := input.Game.HasNestedSingleFile && len(input.Game.Files) > 1
+	// Only the game's selectable "versions" (base + standalone alternate builds)
+	// drive the File Version picker; supplemental add-ons (updates/DLC) are chosen
+	// separately in the add-on step, never as a version here.
+	hasMultipleVersions := input.Game.HasNestedSingleFile && len(input.Game.VersionFiles()) > 1
 	downloadText := i18n.Localize(&goi18n.Message{ID: "button_download", Other: "Download"}, nil)
 	redownloadText := i18n.Localize(&goi18n.Message{ID: "button_redownload", Other: "Redownload"}, nil)
 
@@ -64,16 +67,16 @@ func (s *GameDetailsScreen) Draw(input GameDetailsInput) (GameDetailsOutput, err
 		initialDownloadText = redownloadText
 	}
 
-	// Create dynamic help text for multi-file games
+	// Create dynamic help text for multi-version games
 	var dynamicDownloadText *atomic.String
-	if hasMultipleFiles {
+	if hasMultipleVersions {
 		dynamicDownloadText = atomic.NewString(initialDownloadText)
 	}
 
 	sections := s.buildSections(input)
 
 	// Set OnChange callback for the file version dropdown to update footer dynamically
-	if hasMultipleFiles && dynamicDownloadText != nil {
+	if hasMultipleVersions && dynamicDownloadText != nil {
 		romDirectory := input.Config.GetPlatformRomDirectory(input.Platform)
 		for i := range sections {
 			if sections[i].DropdownID == "file_version" {
@@ -101,7 +104,7 @@ func (s *GameDetailsScreen) Draw(input GameDetailsInput) (GameDetailsOutput, err
 	options.Sections = sections
 	options.ShowThemeBackground = false
 	options.ShowScrollbar = true
-	if hasMultipleFiles {
+	if hasMultipleVersions {
 		options.ConfirmButton = constants.VirtualButtonX
 	}
 	if !internal.IsKidModeEnabled() {
@@ -110,7 +113,7 @@ func (s *GameDetailsScreen) Draw(input GameDetailsInput) (GameDetailsOutput, err
 	}
 
 	downloadButton := "A"
-	if hasMultipleFiles {
+	if hasMultipleVersions {
 		downloadButton = "X"
 	}
 
@@ -172,11 +175,15 @@ func (s *GameDetailsScreen) buildSections(input GameDetailsInput) []gaba.Section
 		logger.Debug("No cover image available", "game", game.Name)
 	}
 
-	// Show file selection dropdown for games with nested single file (multiple versions)
-	if game.HasNestedSingleFile && len(game.Files) > 1 {
-		fileOptions := make([]gaba.DropdownOption, len(game.Files))
+	// Show the File Version picker only for the game's selectable versions — the
+	// base game plus any standalone alternate builds (hacks, prototypes, …).
+	// Supplemental add-ons (updates/DLC) are excluded here; they're offered in the
+	// add-on selection step so they're never mistaken for a whole-game version.
+	versionFiles := game.VersionFiles()
+	if game.HasNestedSingleFile && len(versionFiles) > 1 {
+		fileOptions := make([]gaba.DropdownOption, len(versionFiles))
 		romDirectory := input.Config.GetPlatformRomDirectory(input.Platform)
-		for i, file := range game.Files {
+		for i, file := range versionFiles {
 			label := file.FileName
 			filePath := filepath.Join(romDirectory, file.FileName)
 			if fileutil.FileExists(filePath) {

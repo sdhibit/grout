@@ -26,15 +26,61 @@ func TestRomFileCategoryClassification(t *testing.T) {
 	if RomFileUpdate.IsBase() || RomFileDLC.IsBase() {
 		t.Error("update/dlc must not be base")
 	}
-	for _, c := range []RomFileCategory{RomFileUpdate, RomFileDLC, RomFilePatch, RomFileHack} {
-		if !c.IsGameContentAddon() {
-			t.Errorf("%q should be a game-content add-on", c)
+	// Supplemental add-ons: content layered on top of the base game.
+	for _, c := range []RomFileCategory{RomFileUpdate, RomFileDLC, RomFilePatch} {
+		if !c.IsSupplementalAddon() {
+			t.Errorf("%q should be a supplemental add-on", c)
+		}
+		if c.IsStandaloneVersion() {
+			t.Errorf("%q should not be a standalone version", c)
 		}
 	}
-	for _, c := range []RomFileCategory{"", RomFileGame, RomFileManual, RomFileSoundtrack, RomFileScreenshot} {
-		if c.IsGameContentAddon() {
-			t.Errorf("%q should not be a game-content add-on", c)
+
+	// Standalone versions: whole, independently playable ROMs. Hacks and prototypes
+	// are versions, NOT add-ons — the distinction that keeps them out of the add-on
+	// picker and in the File Version picker.
+	for _, c := range []RomFileCategory{"", RomFileGame, RomFileHack, RomFileMod, RomFileTranslation, RomFileDemo, RomFilePrototype} {
+		if !c.IsStandaloneVersion() {
+			t.Errorf("%q should be a standalone version", c)
 		}
+		if c.IsSupplementalAddon() {
+			t.Errorf("%q should not be a supplemental add-on", c)
+		}
+	}
+
+	// Auxiliary files are neither versions nor add-ons.
+	for _, c := range []RomFileCategory{RomFileManual, RomFileSoundtrack, RomFileScreenshot, RomFileCheat} {
+		if c.IsSupplementalAddon() || c.IsStandaloneVersion() {
+			t.Errorf("%q (auxiliary) should be neither add-on nor version", c)
+		}
+	}
+}
+
+func TestVersionFiles(t *testing.T) {
+	// A game with only base + update + dlc exposes just its base files as versions.
+	v := switchStyleRom().VersionFiles()
+	if len(v) != 2 {
+		t.Fatalf("expected 2 version files (the base files), got %d", len(v))
+	}
+	for _, f := range v {
+		if !f.IsBase() {
+			t.Errorf("file %d (%s) should not be a version", f.ID, f.Category)
+		}
+	}
+
+	// A romhack is a standalone version alongside the base; an update is not.
+	rom := Rom{Files: []RomFile{
+		{ID: 1, FileName: "Sonic.md"},
+		{ID: 2, FileName: "Sonic-hack.md", Category: RomFileHack},
+		{ID: 3, FileName: "Sonic-upd.md", Category: RomFileUpdate},
+	}}
+	v = rom.VersionFiles()
+	ids := map[int]bool{}
+	for _, f := range v {
+		ids[f.ID] = true
+	}
+	if len(v) != 2 || !ids[1] || !ids[2] || ids[3] {
+		t.Errorf("version files = %v, want base(1)+hack(2) but not update(3)", ids)
 	}
 }
 

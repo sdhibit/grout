@@ -333,6 +333,11 @@ different revisions (Rev A, Rev B). When a game has multiple versions available:
 4. Versions you've already downloaded are marked with a download icon prefix
 5. Press `X` to download the selected version
 
+Only whole, independently playable ROMs are listed as versions — the base game plus standalone alternate builds such as
+romhacks, prototypes, demos, mods, and translations. Supplemental add-ons (updates and DLC) are **not** shown here, since
+they aren't complete games; they're chosen separately in the [Add-on picker](settings.md#downloading-a-multi-part-game)
+after you start the download.
+
 ### Game Options
 
 - **Save Slot** - Choose which save slot to sync to for this game. Appears when Save Sync is enabled (device

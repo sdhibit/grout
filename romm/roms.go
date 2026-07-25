@@ -134,13 +134,33 @@ func (c RomFileCategory) IsBase() bool {
 	return c == "" || c == RomFileGame
 }
 
-// IsGameContentAddon reports whether the category is downloadable add-on game
-// content the user chooses to apply on top of the base game (updates, DLC,
-// patches, etc.) — as opposed to auxiliary assets like manuals or soundtracks.
-func (c RomFileCategory) IsGameContentAddon() bool {
+// IsSupplementalAddon reports whether the category is game content layered on top
+// of a base game — updates, DLC, and patches. These require the base game to be
+// present, are offered as selectable downloadable add-ons alongside it, and are
+// never presented as a standalone "version" of the game. Auxiliary assets like
+// manuals or soundtracks are not add-ons either; see IsStandaloneVersion for
+// independently playable alternate builds.
+func (c RomFileCategory) IsSupplementalAddon() bool {
 	switch c {
-	case RomFileUpdate, RomFileDLC, RomFilePatch, RomFileHack, RomFileMod,
-		RomFileTranslation, RomFileDemo, RomFilePrototype:
+	case RomFileUpdate, RomFileDLC, RomFilePatch:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsStandaloneVersion reports whether a file with this category is a complete,
+// independently playable ROM: the base game itself, or an alternate build of it
+// (romhacks, mods, fan translations, demos, prototypes). RomM's convention is that
+// these folders hold whole, working ROMs, so they are offered as selectable
+// "versions" in the File Version picker. Supplemental add-ons (updates/DLC/patches)
+// and auxiliary files (manuals, soundtracks, screenshots) are not versions.
+func (c RomFileCategory) IsStandaloneVersion() bool {
+	if c.IsBase() {
+		return true
+	}
+	switch c {
+	case RomFileHack, RomFileMod, RomFileTranslation, RomFileDemo, RomFilePrototype:
 		return true
 	default:
 		return false
@@ -189,29 +209,43 @@ func (r Rom) BaseFiles() []RomFile {
 	return out
 }
 
-// HasAddons reports whether the ROM has any game-content add-ons (updates, DLC,
-// patches, …). When true, the download flow should offer add-on selection
-// rather than treating every file as an interchangeable "version".
+// VersionFiles returns the files that represent selectable "versions" of the game:
+// the base game plus any standalone alternate builds (hacks, mods, translations,
+// demos, prototypes). Supplemental add-ons (updates/DLC/patches) and auxiliary
+// files (manuals, soundtracks, …) are excluded, so the File Version picker never
+// offers a piece of add-on content as if it were the whole game.
+func (r Rom) VersionFiles() []RomFile {
+	out := make([]RomFile, 0, len(r.Files))
+	for _, f := range r.Files {
+		if f.Category.IsStandaloneVersion() {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// HasAddons reports whether the ROM has any supplemental add-ons (updates, DLC,
+// patches). When true, the download flow offers add-on selection alongside the
+// always-downloaded base game. Standalone alternate builds (hacks, prototypes, …)
+// are not add-ons — they are handled as selectable versions (see VersionFiles).
 func (r Rom) HasAddons() bool {
 	for _, f := range r.Files {
-		if f.Category.IsGameContentAddon() {
+		if f.Category.IsSupplementalAddon() {
 			return true
 		}
 	}
 	return false
 }
 
-// AddonGroups returns the ROM's add-on files grouped by category in a stable
-// display order (updates, DLC, then other content types). Base files and
-// auxiliary files (manuals, soundtracks, screenshots, cheats) are excluded.
+// AddonGroups returns the ROM's supplemental add-on files grouped by category in a
+// stable display order (updates, then DLC, then patches). Base files, standalone
+// alternate builds (hacks, prototypes, …), and auxiliary files (manuals,
+// soundtracks, screenshots, cheats) are excluded.
 func (r Rom) AddonGroups() []AddonGroup {
-	order := []RomFileCategory{
-		RomFileUpdate, RomFileDLC, RomFilePatch, RomFileHack,
-		RomFileMod, RomFileTranslation, RomFileDemo, RomFilePrototype,
-	}
+	order := []RomFileCategory{RomFileUpdate, RomFileDLC, RomFilePatch}
 	byCat := make(map[RomFileCategory][]RomFile)
 	for _, f := range r.Files {
-		if f.Category.IsGameContentAddon() {
+		if f.Category.IsSupplementalAddon() {
 			byCat[f.Category] = append(byCat[f.Category], f)
 		}
 	}
