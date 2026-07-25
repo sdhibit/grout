@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"grout/cfw"
+	"grout/cfw/esde"
 	"grout/cfw/muos"
 	"grout/internal"
 	"grout/internal/artutil"
@@ -188,6 +189,10 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 					return nil, err
 				}
 
+				// esdeGamePath, when set, is the exact path ES-DE's organizer chose
+				// for the game entry (a rewritten .m3u, or a promoted primary disc for
+				// emulators like PCSX2 that can't load playlists).
+				esdeGamePath := ""
 				if cfw.GetCFW() == cfw.MuOS {
 					if err := muos.OrganizeMultiFileRom(extractDir, romDirectory, g.FsNameNoExt); err != nil {
 						logger.Error("Failed to organize multi-file ROM for muOS", "game", g.FsNameNoExt, "error", err)
@@ -195,6 +200,18 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 						os.RemoveAll(extractDir)
 						return nil, err
 					}
+				} else if cfw.GetCFW() == cfw.ESDE {
+					// ES-DE scans every file in the system directory, so hide the disc
+					// images in a dot-prefixed folder and expose a single launchable
+					// entry — one game instead of one per disc.
+					p, err := esde.OrganizeMultiFileRom(extractDir, romDirectory, g.FsNameNoExt, esde.SupportsM3U(gamePlatform.FSSlug))
+					if err != nil {
+						logger.Error("Failed to organize multi-file ROM for ES-DE", "game", g.FsNameNoExt, "error", err)
+						os.Remove(tmpZipPath)
+						os.RemoveAll(extractDir)
+						return nil, err
+					}
+					esdeGamePath = p
 				}
 
 				if err := os.Remove(tmpZipPath); err != nil {
@@ -203,7 +220,10 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 
 				// Update the gamelist entry to point to the extracted file
 				// instead of the (now deleted) temporary zip.
-				newGamePath := resolveExtractedGamePath(romDirectory, extractDir, g.FsNameNoExt)
+				newGamePath := esdeGamePath
+				if newGamePath == "" {
+					newGamePath = resolveExtractedGamePath(romDirectory, extractDir, g.FsNameNoExt)
+				}
 				for i, entry := range gamelistEntries {
 					if entry.Game.ID == g.ID {
 						gamelistEntries[i].GamePath = newGamePath
