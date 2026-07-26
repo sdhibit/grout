@@ -66,17 +66,38 @@ func addonSectionHeader(label string) string {
 	return strings.ToUpper(label)
 }
 
+// addonLabelMaxRunes caps the visible length of a file row's name. gabagool's
+// list re-rasterizes and re-truncates every visible row's text every frame (and
+// scrolls the focused one), so long names tank the framerate. Keeping rows short
+// avoids that per-frame work; the full name is a button-press away (see the file-
+// names view). The budget is conservative so labels fit without scrolling on the
+// narrower target screens.
+const addonLabelMaxRunes = 40
+
 // addonItemText renders a file row, indented so it reads as nested under its
 // section header and prefixing a download icon when the file is already on disk
-// so it's clear why it defaults to unchecked. Keeping the category on the header
-// (not on every row) also shortens each row, which the list renders far more
-// cheaply — long, per-row text is what makes this screen chug.
+// so it's clear why it defaults to unchecked.
 func addonItemText(fileName string, downloaded bool) string {
 	prefix := "  "
 	if downloaded {
 		prefix += gabaconst.Download + " "
 	}
 	return prefix + fileName
+}
+
+// middleEllipsize shortens s to at most max runes by dropping the middle and
+// joining the head and tail with "…", keeping both ends visible so files that
+// differ only near the end (e.g. "(DLC Pack 2)") stay distinguishable.
+func middleEllipsize(s string, max int) string {
+	r := []rune(s)
+	if max < 5 || len(r) <= max {
+		return s
+	}
+	const ell = "..."
+	keep := max - len(ell)
+	head := (keep + 1) / 2
+	tail := keep - head
+	return string(r[:head]) + ell + string(r[len(r)-tail:])
 }
 
 func addonCategoryLabel(c romm.RomFileCategory) string {
@@ -129,80 +150,131 @@ func (s *AddonSelectionScreen) Draw(input AddonSelectionInput) (AddonSelectionRe
 		return ok && fileutil.FileExists(loc)
 	}
 
-	items := make([]gaba.MenuItem, 0)
-
-	// Build the checklist as labeled sections (Base, then Update/DLC/…). Each
-	// section gets a non-selectable header row and its files are indented beneath
-	// it, so the groups are easy to tell apart at a glance. Header rows carry no
-	// Metadata, so they're ignored when collecting the selected file IDs.
-	appendSection := func(header string, files []romm.RomFile) {
-		if len(files) == 0 {
-			return
-		}
-		items = append(items, gaba.MenuItem{
-			Text:               addonSectionHeader(header),
-			NotMultiSelectable: true,
-		})
-		for _, f := range files {
-			downloaded := isDownloaded(f.ID)
-			items = append(items, gaba.MenuItem{
-				Text:     addonItemText(f.FileName, downloaded),
-				Selected: !downloaded, // pre-check what isn't downloaded; user unchecks the rest
-				Metadata: f.ID,
-			})
-		}
+	// The game's files as labeled sections (Base first, then each add-on category
+	// in its stable order), computed once. Each section becomes a non-selectable
+	// header row with its files indented beneath.
+	type section struct {
+		header string
+		files  []romm.RomFile
 	}
-
-	// Base game first (now toggleable: leave it unchecked when it's already on
-	// disk to add an add-on without re-fetching it, or check it to re-download),
-	// then each add-on category in its stable display order.
+	var sections []section
 	baseLabel := i18n.Localize(&goi18n.Message{ID: "addon_category_base", Other: "Base"}, nil)
-	appendSection(baseLabel, game.BaseFiles())
+	if bf := game.BaseFiles(); len(bf) > 0 {
+		sections = append(sections, section{baseLabel, bf})
+	}
 	for _, group := range game.AddonGroups() {
-		appendSection(addonCategoryLabel(group.Category), group.Files)
+		sections = append(sections, section{addonCategoryLabel(group.Category), group.Files})
 	}
 
-	options := gaba.DefaultListOptions(
-		i18n.Localize(&goi18n.Message{ID: "addon_selection_title", Other: "Files to Download"}, nil),
-		items,
-	)
-	options.UseSmallTitle = true
-	options.InitialMultiSelectMode = true
-	// Start focus on the first real file rather than the leading "BASE" header
-	// (index 0), which isn't selectable.
-	options.SelectedIndex = 1
-	// A toggles the highlighted item's checkbox (gabagool's built-in multi-select
-	// toggle). We deliberately do NOT bind MultiSelectButton to A: that button
-	// toggles multi-select *mode* off, which clears every checkbox and drops the
-	// list out of multi-select on the first A press.
-	options.MultiSelectConfirmButton = gabaconst.VirtualButtonStart
-	options.SelectAllButton = gabaconst.VirtualButtonR1
-	options.DeselectAllButton = gabaconst.VirtualButtonL1
-	options.FooterHelpItems = []gaba.FooterHelpItem{
-		FooterBack(),
-		{ButtonName: "A", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_toggle", Other: "Toggle"}, nil)},
-		{ButtonName: "L1", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_none", Other: "None"}, nil)},
-		{ButtonName: "R1", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_all", Other: "All"}, nil)},
-		{ButtonName: "Start", HelpText: i18n.Localize(&goi18n.Message{ID: "button_download", Other: "Download"}, nil)},
-	}
-
-	result, err := gaba.List(options)
-	if err != nil {
-		if errors.Is(err, gaba.ErrCancelled) {
-			return AddonSelectionResult{Confirmed: false}, nil
+	// Checkbox state keyed by file ID, so it survives rebuilding the list when the
+	// user pops the file-names view. Defaults to checking what isn't downloaded yet.
+	checked := make(map[int]bool)
+	for _, sec := range sections {
+		for _, f := range sec.files {
+			checked[f.ID] = !isDownloaded(f.ID)
 		}
-		return AddonSelectionResult{}, err
 	}
 
-	// Non-nil even when empty: this signals downstream that the picker ran, so the
-	// planner fetches exactly this set instead of defaulting to the base game.
-	res := AddonSelectionResult{Confirmed: true, SelectedFileIDs: []int{}}
-	for _, idx := range result.Selected {
-		if idx >= 0 && idx < len(items) {
-			if id, ok := items[idx].Metadata.(int); ok {
-				res.SelectedFileIDs = append(res.SelectedFileIDs, id)
+	// showFileNames opens a read-only, scrollable view of the untruncated file
+	// names — the way to see a full name the picker rows ellipsize away.
+	showFileNames := func() {
+		items := make([]gaba.MenuItem, 0)
+		for _, sec := range sections {
+			items = append(items, gaba.MenuItem{Text: addonSectionHeader(sec.header), NotMultiSelectable: true})
+			for _, f := range sec.files {
+				items = append(items, gaba.MenuItem{Text: "  " + f.FileName})
 			}
 		}
+		opts := gaba.DefaultListOptions(
+			i18n.Localize(&goi18n.Message{ID: "addon_file_names_title", Other: "File Names"}, nil),
+			items,
+		)
+		opts.UseSmallTitle = true
+		opts.SelectedIndex = 1
+		opts.FooterHelpItems = []gaba.FooterHelpItem{FooterBack()}
+		gaba.List(opts) // read-only: any exit returns to the picker
 	}
-	return res, nil
+
+	for {
+		// Build the checklist fresh each pass so it reflects the preserved checkbox
+		// state. Names are middle-ellipsized to keep every row short — long rows are
+		// what make gabagool's list re-render endlessly and drop frames.
+		items := make([]gaba.MenuItem, 0)
+		for _, sec := range sections {
+			items = append(items, gaba.MenuItem{Text: addonSectionHeader(sec.header), NotMultiSelectable: true})
+			for _, f := range sec.files {
+				items = append(items, gaba.MenuItem{
+					Text:     addonItemText(middleEllipsize(f.FileName, addonLabelMaxRunes), isDownloaded(f.ID)),
+					Selected: checked[f.ID],
+					Metadata: f.ID,
+				})
+			}
+		}
+
+		options := gaba.DefaultListOptions(
+			i18n.Localize(&goi18n.Message{ID: "addon_selection_title", Other: "Files to Download"}, nil),
+			items,
+		)
+		options.UseSmallTitle = true
+		options.InitialMultiSelectMode = true
+		// Start focus on the first real file rather than the leading "BASE" header
+		// (index 0), which isn't selectable.
+		options.SelectedIndex = 1
+		// A toggles the highlighted item's checkbox (gabagool's built-in multi-select
+		// toggle). We deliberately do NOT bind MultiSelectButton to A: that button
+		// toggles multi-select *mode* off, which clears every checkbox and drops the
+		// list out of multi-select on the first A press.
+		options.MultiSelectConfirmButton = gabaconst.VirtualButtonStart
+		options.SelectAllButton = gabaconst.VirtualButtonR1
+		options.DeselectAllButton = gabaconst.VirtualButtonL1
+		// X opens the full file-names view (the picker rows are ellipsized).
+		options.ActionButton = gabaconst.VirtualButtonX
+		options.FooterHelpItems = []gaba.FooterHelpItem{
+			FooterBack(),
+			{ButtonName: "A", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_toggle", Other: "Toggle"}, nil)},
+			{ButtonName: "X", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_view_names", Other: "Names"}, nil)},
+			{ButtonName: "L1", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_none", Other: "None"}, nil)},
+			{ButtonName: "R1", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_all", Other: "All"}, nil)},
+			{ButtonName: "Start", HelpText: i18n.Localize(&goi18n.Message{ID: "button_download", Other: "Download"}, nil)},
+		}
+
+		result, err := gaba.List(options)
+		if err != nil {
+			if errors.Is(err, gaba.ErrCancelled) {
+				return AddonSelectionResult{Confirmed: false}, nil
+			}
+			return AddonSelectionResult{}, err
+		}
+
+		// Sync the preserved checkbox state from what's currently checked.
+		for id := range checked {
+			checked[id] = false
+		}
+		for _, idx := range result.Selected {
+			if idx >= 0 && idx < len(items) {
+				if id, ok := items[idx].Metadata.(int); ok {
+					checked[id] = true
+				}
+			}
+		}
+
+		// X: peek at the full names, then reopen the picker with checks intact.
+		if result.Action == gaba.ListActionTriggered {
+			showFileNames()
+			continue
+		}
+
+		// Confirmed. Collect selected file IDs in section order. Non-nil even when
+		// empty: this signals downstream that the picker ran, so the planner fetches
+		// exactly this set instead of defaulting to the base game.
+		res := AddonSelectionResult{Confirmed: true, SelectedFileIDs: []int{}}
+		for _, sec := range sections {
+			for _, f := range sec.files {
+				if checked[f.ID] {
+					res.SelectedFileIDs = append(res.SelectedFileIDs, f.ID)
+				}
+			}
+		}
+		return res, nil
+	}
 }
