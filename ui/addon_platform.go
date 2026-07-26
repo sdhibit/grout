@@ -66,8 +66,15 @@ func (s *AddonPlatformScreen) Draw(input AddonPlatformInput) (AddonPlatformOutpu
 		baseCustom = mapping.BaseDir
 	}
 	baseCustomDisplay := customLabel
+	// Prefill the keyboard with the path currently in effect so editing the base
+	// folder starts from the real path instead of a blank field. When a custom
+	// base is set, that's the starting point; otherwise it's the ROM directory.
+	// DisplayName/Value stay as-is, so an unedited confirm still resolves to the
+	// default base (non-destructive).
+	baseKeyboardPrompt := romDir
 	if baseCustom != "" {
 		baseCustomDisplay = baseCustom
+		baseKeyboardPrompt = baseCustom
 	}
 	items := []gaba.ItemWithOptions{
 		{
@@ -80,7 +87,7 @@ func (s *AddonPlatformScreen) Draw(input AddonPlatformInput) (AddonPlatformOutpu
 				{
 					Type:           gaba.OptionTypeKeyboard,
 					DisplayName:    baseCustomDisplay,
-					KeyboardPrompt: baseCustom,
+					KeyboardPrompt: baseKeyboardPrompt,
 					Value:          baseCustom,
 				},
 			},
