@@ -46,10 +46,15 @@ func executeDownloadUI(state *AppState, r ui.GameDetailsOutput, stack *router.St
 	}
 
 	// For a categorized multi-part game (updates/DLC), let the user pick which
-	// add-ons to download alongside the base game before starting.
+	// files to download — base game included, so an already-downloaded base can
+	// be left in place while adding an update or DLC.
 	var selectedAddonIDs []int
 	if r.Game.HasAddons() {
-		res, err := ui.NewAddonSelectionScreen().Draw(r.Game)
+		res, err := ui.NewAddonSelectionScreen().Draw(ui.AddonSelectionInput{
+			Game:     r.Game,
+			Config:   state.Config,
+			Platform: r.Platform,
+		})
 		if err != nil {
 			gaba.GetLogger().Error("Add-on selection failed", "error", err)
 			return

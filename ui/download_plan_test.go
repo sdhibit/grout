@@ -29,14 +29,16 @@ func find(plan []plannedDownload, id int) (plannedDownload, bool) {
 	return plannedDownload{}, false
 }
 
-func TestPlanBaseAlwaysIncludedAddonsBySelection(t *testing.T) {
+func TestPlanAddonsBySelectionKeepsBaseAsAnchor(t *testing.T) {
 	romDir := "/roms/switch"
-	// User picked the update and dlc1, but not dlc2.
+	// The base is already downloaded, so the user left it unchecked and picked
+	// only the update and dlc1 (not dlc2).
 	selected := map[int]bool{12: true, 13: true}
 
 	plan := planRomDownloads(switchRom(), selected, romDir, nil)
 
-	// Base is always present, at romDir root, flagged IsBase.
+	// Base is still present (it anchors the gamelist/artwork entry), at romDir
+	// root, flagged IsBase — but not fetched, since it wasn't selected.
 	base, ok := find(plan, 10)
 	if !ok {
 		t.Fatal("base file missing from plan")
@@ -44,14 +46,17 @@ func TestPlanBaseAlwaysIncludedAddonsBySelection(t *testing.T) {
 	if base.Location != filepath.Join(romDir, "Zelda.nsp") || !base.IsBase {
 		t.Errorf("base placement wrong: %+v", base)
 	}
+	if base.Download {
+		t.Error("unselected base should not be flagged for download")
+	}
 
-	// Selected add-ons land in their category subfolder by default.
+	// Selected add-ons land in their category subfolder by default and are fetched.
 	upd, ok := find(plan, 12)
-	if !ok || upd.Location != filepath.Join(romDir, "update", "Zelda-upd.nsp") || upd.IsBase {
+	if !ok || upd.Location != filepath.Join(romDir, "update", "Zelda-upd.nsp") || upd.IsBase || !upd.Download {
 		t.Errorf("update placement wrong: %+v (ok=%v)", upd, ok)
 	}
 	dlc1, ok := find(plan, 13)
-	if !ok || dlc1.Location != filepath.Join(romDir, "dlc", "Zelda-dlc1.nsp") {
+	if !ok || dlc1.Location != filepath.Join(romDir, "dlc", "Zelda-dlc1.nsp") || !dlc1.Download {
 		t.Errorf("dlc1 placement wrong: %+v (ok=%v)", dlc1, ok)
 	}
 
@@ -64,10 +69,35 @@ func TestPlanBaseAlwaysIncludedAddonsBySelection(t *testing.T) {
 	}
 }
 
-func TestPlanNoAddonsSelectedDownloadsBaseOnly(t *testing.T) {
+func TestPlanBaseSelectedIsFetched(t *testing.T) {
+	// User re-checked the base along with the update.
+	selected := map[int]bool{10: true, 12: true}
+	plan := planRomDownloads(switchRom(), selected, "/roms/switch", nil)
+
+	base, ok := find(plan, 10)
+	if !ok || !base.Download {
+		t.Errorf("selected base should be flagged for download: %+v (ok=%v)", base, ok)
+	}
+}
+
+func TestPlanEmptySelectionFetchesNothing(t *testing.T) {
+	// A non-nil, empty selection means the picker ran and the user unchecked
+	// everything: the base stays as an anchor but nothing is fetched.
 	plan := planRomDownloads(switchRom(), map[int]bool{}, "/roms/switch", nil)
 	if len(plan) != 1 || plan[0].FileID != 10 {
-		t.Fatalf("expected base-only plan, got %+v", plan)
+		t.Fatalf("expected base-only anchor plan, got %+v", plan)
+	}
+	if plan[0].Download {
+		t.Error("empty selection should not fetch the base")
+	}
+}
+
+func TestPlanNilSelectionDownloadsBaseOnly(t *testing.T) {
+	// A nil selection means no picker ran (bulk / non-categorized): fetch the
+	// base, no add-ons.
+	plan := planRomDownloads(switchRom(), nil, "/roms/switch", nil)
+	if len(plan) != 1 || plan[0].FileID != 10 || !plan[0].Download {
+		t.Fatalf("expected base-only fetch plan, got %+v", plan)
 	}
 }
 
@@ -95,7 +125,7 @@ func TestPlanAddonDestinationOverride(t *testing.T) {
 func TestPlanPlainSingleFileRom(t *testing.T) {
 	rom := romm.Rom{ID: 2, Files: []romm.RomFile{{ID: 1, FileName: "Mario.sfc"}}}
 	plan := planRomDownloads(rom, nil, "/roms/snes", nil)
-	if len(plan) != 1 || plan[0].Location != filepath.Join("/roms/snes", "Mario.sfc") || !plan[0].IsBase {
+	if len(plan) != 1 || plan[0].Location != filepath.Join("/roms/snes", "Mario.sfc") || !plan[0].IsBase || !plan[0].Download {
 		t.Fatalf("plain rom plan wrong: %+v", plan)
 	}
 }

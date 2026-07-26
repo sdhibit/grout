@@ -100,6 +100,13 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 
 	downloads, artDownloads, gamelistEntries := s.buildDownloads(input.Config, input.Host, input.Platform, input.SelectedGames, input.SelectedFileID, input.SelectedAddonIDs)
 
+	// Nothing to fetch — e.g. every file was already downloaded and the user
+	// unchecked them all in the add-on picker. Skip the download manager.
+	if len(downloads) == 0 {
+		logger.Debug("No files to download; nothing selected")
+		return output, nil
+	}
+
 	headers := make(map[string]string)
 	headers["Authorization"] = input.Host.AuthHeader()
 
@@ -383,9 +390,16 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 	artDownloads := make([]artDownload, 0, len(games))
 	gamesSummaries := make([]gamelist.RomGameEntry, 0, len(games))
 
-	addonIDSet := make(map[int]bool, len(selectedAddonIDs))
-	for _, id := range selectedAddonIDs {
-		addonIDSet[id] = true
+	// A nil selection means no add-on picker ran (bulk or non-categorized
+	// download): base only. A non-nil (even empty) selection is an explicit
+	// picker result, so keep the nil-ness intact to pass that distinction on to
+	// planRomDownloads.
+	var addonIDSet map[int]bool
+	if selectedAddonIDs != nil {
+		addonIDSet = make(map[int]bool, len(selectedAddonIDs))
+		for _, id := range selectedAddonIDs {
+			addonIDSet[id] = true
+		}
 	}
 
 	for _, g := range games {
@@ -407,6 +421,12 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 		downloadLocation := ""
 
 		sourceURL := ""
+
+		// queuePrimaryDownload is whether the game's primary file (the base) is
+		// actually fetched. It stays true for every path except a categorized game
+		// whose base is already on disk and left unselected in the add-on picker —
+		// there we keep the base only as the gamelist/artwork anchor.
+		queuePrimaryDownload := true
 
 		// extraDownloads holds add-on files (updates, DLC, …) for a categorized
 		// multi-part ROM. The base file is handled via downloadLocation/sourceURL
@@ -440,6 +460,15 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 			}
 			downloadLocation = base.Location
 			sourceURL = fileContentURL(host, g.ID, base.FileName, base.FileID)
+			if !base.Download {
+				// Base is already downloaded (or the user unchecked it): keep it as
+				// the gamelist/artwork anchor but don't re-fetch it. If there are no
+				// add-ons to fetch either, there's nothing to do for this game.
+				queuePrimaryDownload = false
+				if len(extraDownloads) == 0 {
+					continue
+				}
+			}
 		} else if g.HasMultipleFiles {
 			tmpDir := fileutil.TempDir()
 			downloadLocation = filepath.Join(tmpDir, fmt.Sprintf("grout_multirom_%d.zip", g.ID))
@@ -470,12 +499,14 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 
 		gamelistRomEntry.GamePath = downloadLocation
 
-		downloads = append(downloads, gaba.Download{
-			URL:         sourceURL,
-			Location:    downloadLocation,
-			DisplayName: g.Name,
-			Timeout:     config.DownloadTimeout.Duration(),
-		})
+		if queuePrimaryDownload {
+			downloads = append(downloads, gaba.Download{
+				URL:         sourceURL,
+				Location:    downloadLocation,
+				DisplayName: g.Name,
+				Timeout:     config.DownloadTimeout.Duration(),
+			})
+		}
 		// Queue the selected add-on files (they share the base game's artwork
 		// and gamelist entry, so no extra art/metadata handling is needed).
 		downloads = append(downloads, extraDownloads...)
