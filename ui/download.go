@@ -98,7 +98,7 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 		SearchFilter: input.SearchFilter,
 	}
 
-	downloads, artDownloads, gamelistEntries := s.buildDownloads(input.Config, input.Host, input.Platform, input.SelectedGames, input.SelectedFileID, input.SelectedAddonIDs)
+	downloads, artDownloads, gamelistEntries, ignoreDirs := s.buildDownloads(input.Config, input.Host, input.Platform, input.SelectedGames, input.SelectedFileID, input.SelectedAddonIDs)
 
 	// Nothing to fetch — e.g. every file was already downloaded and the user
 	// unchecked them all in the add-on picker. Skip the download manager.
@@ -152,6 +152,14 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 
 	if len(res.Completed) == 0 {
 		return output, nil
+	}
+
+	// Tell ES-DE to skip the add-on folders (update/, dlc/, …) so their files
+	// don't each show up as a separate game entry.
+	for _, dir := range ignoreDirs {
+		if err := esde.MarkDirectoryIgnored(dir); err != nil {
+			logger.Warn("Failed to mark add-on folder ignored for ES-DE", "dir", dir, "error", err)
+		}
 	}
 
 	for _, g := range input.SelectedGames {
@@ -385,10 +393,16 @@ func fileContentURL(host romm.Host, romID int, fileName string, fileID int) stri
 	return u + "?" + url.Values{"file_ids": {strconv.Itoa(fileID)}}.Encode()
 }
 
-func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, platform romm.Platform, games []romm.Rom, selectedFileID int, selectedAddonIDs []int) ([]gaba.Download, []artDownload, []gamelist.RomGameEntry) {
+func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, platform romm.Platform, games []romm.Rom, selectedFileID int, selectedAddonIDs []int) ([]gaba.Download, []artDownload, []gamelist.RomGameEntry, []string) {
 	downloads := make([]gaba.Download, 0, len(games))
 	artDownloads := make([]artDownload, 0, len(games))
 	gamesSummaries := make([]gamelist.RomGameEntry, 0, len(games))
+
+	// ignoreDirs collects add-on subfolders (update/, dlc/, …) that live inside an
+	// ES-DE ROM directory. They get a noload.txt marker after download so ES-DE
+	// skips them instead of listing each add-on file as its own game.
+	ignoreDirSet := make(map[string]bool)
+	markIgnored := cfw.GetCFW() == cfw.ESDE
 
 	// A nil selection means no add-on picker ran (bulk or non-categorized
 	// download): base only. A non-nil (even empty) selection is an explicit
@@ -453,6 +467,15 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 					DisplayName: fmt.Sprintf("%s – %s", g.Name, plan[i].FileName),
 					Timeout:     config.DownloadTimeout.Duration(),
 				})
+				// Hide the add-on's folder from ES-DE when it's a subfolder of the
+				// ROM directory (not the base folder itself, and not a custom path
+				// routed elsewhere — those either must stay visible or aren't scanned).
+				if markIgnored {
+					dir := filepath.Dir(plan[i].Location)
+					if rel, err := filepath.Rel(romDirectory, dir); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+						ignoreDirSet[dir] = true
+					}
+				}
 			}
 			if base == nil {
 				gaba.GetLogger().Warn("Categorized ROM has no base file; skipping", "game", g.Name, "id", g.ID)
@@ -688,7 +711,12 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 		gamesSummaries = append(gamesSummaries, gamelistRomEntry)
 	}
 
-	return downloads, artDownloads, gamesSummaries
+	ignoreDirs := make([]string, 0, len(ignoreDirSet))
+	for dir := range ignoreDirSet {
+		ignoreDirs = append(ignoreDirs, dir)
+	}
+
+	return downloads, artDownloads, gamesSummaries, ignoreDirs
 }
 
 // resolveExtractedGamePath returns the best path for a multi-file ROM after extraction.
