@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"grout/cache"
 	"grout/internal"
-	"grout/internal/fileutil"
 	"grout/internal/imageutil"
 	"grout/internal/stringutil"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -22,7 +19,6 @@ import (
 	"github.com/BrandonKowalski/gabagool/v2/pkg/gabagool/constants"
 	"github.com/BrandonKowalski/gabagool/v2/pkg/gabagool/i18n"
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
-	"go.uber.org/atomic"
 )
 
 type GameDetailsInput struct {
@@ -35,7 +31,6 @@ type GameDetailsInput struct {
 type GameDetailsOutput struct {
 	Action            GameDetailsAction
 	DownloadRequested bool
-	SelectedFileID    int
 	Game              romm.Rom
 	Platform          romm.Platform
 }
@@ -54,67 +49,21 @@ func (s *GameDetailsScreen) Draw(input GameDetailsInput) (GameDetailsOutput, err
 		Platform: input.Platform,
 	}
 
-	// Only the game's selectable "versions" (base + standalone alternate builds)
-	// drive the File Version picker; supplemental add-ons (updates/DLC) are chosen
-	// separately in the add-on step, never as a version here.
-	hasMultipleVersions := input.Game.HasNestedSingleFile && len(input.Game.VersionFiles()) > 1
+	// Footer text reflects whether the game is already on disk. Choosing among
+	// multiple versions (when applicable) happens on a separate picker screen after
+	// download is requested, not inline here.
 	downloadText := i18n.Localize(&goi18n.Message{ID: "button_download", Other: "Download"}, nil)
-	redownloadText := i18n.Localize(&goi18n.Message{ID: "button_redownload", Other: "Redownload"}, nil)
-
-	// Determine initial download text based on first file
-	initialDownloadText := downloadText
 	if input.Game.IsDownloaded(input.Config) {
-		initialDownloadText = redownloadText
-	}
-
-	// Create dynamic help text for multi-version games
-	var dynamicDownloadText *atomic.String
-	if hasMultipleVersions {
-		dynamicDownloadText = atomic.NewString(initialDownloadText)
-	}
-
-	sections := s.buildSections(input)
-
-	// Set OnChange callback for the file version dropdown to update footer dynamically
-	if hasMultipleVersions && dynamicDownloadText != nil {
-		romDirectory := input.Config.GetPlatformRomDirectory(input.Platform)
-		for i := range sections {
-			if sections[i].DropdownID == "file_version" {
-				sections[i].OnChange = func(option gaba.DropdownOption) {
-					if fileID, err := strconv.Atoi(option.Value); err == nil {
-						for _, file := range input.Game.Files {
-							if file.ID == fileID {
-								filePath := filepath.Join(romDirectory, file.FileName)
-								if fileutil.FileExists(filePath) {
-									dynamicDownloadText.Store(redownloadText)
-								} else {
-									dynamicDownloadText.Store(downloadText)
-								}
-								return
-							}
-						}
-					}
-				}
-				break
-			}
-		}
+		downloadText = i18n.Localize(&goi18n.Message{ID: "button_redownload", Other: "Redownload"}, nil)
 	}
 
 	options := gaba.DefaultInfoScreenOptions()
-	options.Sections = sections
+	options.Sections = s.buildSections(input)
 	options.ShowThemeBackground = false
 	options.ShowScrollbar = true
-	if hasMultipleVersions {
-		options.ConfirmButton = constants.VirtualButtonX
-	}
 	if !internal.IsKidModeEnabled() {
 		options.ActionButton = constants.VirtualButtonY
 		options.AllowAction = true
-	}
-
-	downloadButton := "A"
-	if hasMultipleVersions {
-		downloadButton = "X"
 	}
 
 	// Build footer items
@@ -125,9 +74,8 @@ func (s *GameDetailsScreen) Draw(input GameDetailsInput) (GameDetailsOutput, err
 		footerItems = append(footerItems, gaba.FooterHelpItem{ButtonName: "Y", HelpText: i18n.Localize(&goi18n.Message{ID: "button_options", Other: "Options"}, nil)})
 	}
 	footerItems = append(footerItems, gaba.FooterHelpItem{
-		ButtonName:      downloadButton,
-		HelpText:        initialDownloadText,
-		HelpTextDynamic: dynamicDownloadText,
+		ButtonName: "A",
+		HelpText:   downloadText,
 	})
 
 	result, err := gaba.DetailScreen(input.Game.Name, options, footerItems)
@@ -143,15 +91,6 @@ func (s *GameDetailsScreen) Draw(input GameDetailsInput) (GameDetailsOutput, err
 	if result.Action == gaba.DetailActionConfirmed {
 		output.Action = GameDetailsActionDownload
 		output.DownloadRequested = true
-		// Check if a specific file was selected from the dropdown
-		for _, selection := range result.DropdownSelections {
-			if selection.ID == "file_version" {
-				if fileID, err := strconv.Atoi(selection.Option.Value); err == nil {
-					output.SelectedFileID = fileID
-				}
-				break
-			}
-		}
 		return output, nil
 	}
 
@@ -173,33 +112,6 @@ func (s *GameDetailsScreen) buildSections(input GameDetailsInput) []gaba.Section
 		sections = append(sections, gaba.NewImageSection("", coverImagePath, 640, 480, constants.TextAlignCenter))
 	} else {
 		logger.Debug("No cover image available", "game", game.Name)
-	}
-
-	// Show the File Version picker only for the game's selectable versions — the
-	// base game plus any standalone alternate builds (hacks, prototypes, …).
-	// Supplemental add-ons (updates/DLC) are excluded here; they're offered in the
-	// add-on selection step so they're never mistaken for a whole-game version.
-	versionFiles := game.VersionFiles()
-	if game.HasNestedSingleFile && len(versionFiles) > 1 {
-		fileOptions := make([]gaba.DropdownOption, len(versionFiles))
-		romDirectory := input.Config.GetPlatformRomDirectory(input.Platform)
-		for i, file := range versionFiles {
-			label := file.FileName
-			filePath := filepath.Join(romDirectory, file.FileName)
-			if fileutil.FileExists(filePath) {
-				label = constants.Download + " " + label
-			}
-			fileOptions[i] = gaba.DropdownOption{
-				Label: label,
-				Value: fmt.Sprintf("%d", file.ID),
-			}
-		}
-		sections = append(sections, gaba.NewDropdownSection(
-			i18n.Localize(&goi18n.Message{ID: "game_details_file_version", Other: "File Version"}, nil),
-			"file_version",
-			fileOptions,
-			0,
-		))
 	}
 
 	if game.Summary != "" {

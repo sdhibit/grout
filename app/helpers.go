@@ -45,11 +45,15 @@ func executeDownloadUI(state *AppState, r ui.GameDetailsOutput, stack *router.St
 		}
 	}
 
-	// For a categorized multi-part game (updates/DLC), let the user pick which
-	// files to download — base game included, so an already-downloaded base can
-	// be left in place while adding an update or DLC.
+	// Multi-file ROMs need a choice before downloading, each via its own list picker:
+	//   - categorized multi-part game (base + updates/DLC): a checklist of add-ons
+	//     (base included, so an already-downloaded base can stay while adding an add-on)
+	//   - a game with multiple standalone versions (base + hacks/prototypes/…): a
+	//     single-select version picker
 	var selectedAddonIDs []int
-	if r.Game.HasAddons() {
+	var selectedFileID int
+	switch {
+	case r.Game.HasAddons():
 		res, err := ui.NewAddonSelectionScreen().Draw(ui.AddonSelectionInput{
 			Game:     r.Game,
 			Config:   state.Config,
@@ -63,10 +67,21 @@ func executeDownloadUI(state *AppState, r ui.GameDetailsOutput, stack *router.St
 			return
 		}
 		selectedAddonIDs = res.SelectedFileIDs
+	case r.Game.HasNestedSingleFile && len(r.Game.VersionFiles()) > 1:
+		romDir := state.Config.GetPlatformRomDirectory(r.Platform)
+		res, err := ui.NewFileVersionScreen().Draw(r.Game, romDir)
+		if err != nil {
+			gaba.GetLogger().Error("File version selection failed", "error", err)
+			return
+		}
+		if !res.Confirmed {
+			return
+		}
+		selectedFileID = res.SelectedFileID
 	}
 
 	downloadScreen := ui.NewDownloadScreen()
-	downloadScreen.Execute(*state.Config, state.Host, r.Platform, []romm.Rom{r.Game}, allGames, searchFilter, r.SelectedFileID, selectedAddonIDs)
+	downloadScreen.Execute(*state.Config, state.Host, r.Platform, []romm.Rom{r.Game}, allGames, searchFilter, selectedFileID, selectedAddonIDs)
 }
 
 func executeMultiDownloadUI(state *AppState, r ui.GameListOutput) {
