@@ -43,7 +43,7 @@ func TestBuildDownloads_EmptyFiles(t *testing.T) {
 		}
 	}()
 
-	downloads, artDownloads, gamelistEntries, _ := s.buildDownloads(config, host, platform, games, 0, nil)
+	downloads, artDownloads, gamelistEntries, _ := s.buildDownloads(config, host, platform, games, 0, nil, false)
 
 	if len(downloads) != 0 {
 		t.Errorf("expected 0 downloads when Files is empty, got %d", len(downloads))
@@ -77,7 +77,7 @@ func TestBuildDownloads_SingleFile_HappyPath(t *testing.T) {
 		},
 	}
 
-	downloads, _, gamelistEntries, _ := s.buildDownloads(config, host, platform, games, 0, nil)
+	downloads, _, gamelistEntries, _ := s.buildDownloads(config, host, platform, games, 0, nil, false)
 
 	if len(downloads) != 1 {
 		t.Fatalf("expected 1 download, got %d", len(downloads))

@@ -101,6 +101,33 @@ func TestPlanNilSelectionDownloadsBaseOnly(t *testing.T) {
 	}
 }
 
+func TestAutoAddonSelectionPicksBaseAndAllSupplemental(t *testing.T) {
+	// Bulk download's implicit "grab everything" choice: base + every update/DLC,
+	// but never the auxiliary manual.
+	selected := autoAddonSelection(switchRom())
+
+	for _, id := range []int{10, 12, 13, 14} { // base, update, dlc1, dlc2
+		if !selected[id] {
+			t.Errorf("expected file %d to be selected", id)
+		}
+	}
+	if selected[15] { // manual
+		t.Error("auxiliary manual should not be selected")
+	}
+
+	// Feeding it to the planner fetches the base plus all three add-ons.
+	plan := planRomDownloads(switchRom(), selected, "/roms/switch", nil)
+	for _, id := range []int{10, 12, 13, 14} {
+		p, ok := find(plan, id)
+		if !ok || !p.Download {
+			t.Errorf("file %d should be fetched in a bulk grab: %+v (ok=%v)", id, p, ok)
+		}
+	}
+	if _, ok := find(plan, 15); ok {
+		t.Error("auxiliary manual must never be in the download plan")
+	}
+}
+
 func TestPlanAddonDestinationOverride(t *testing.T) {
 	// Redirect updates and DLC to an emulator-specific folder (the Switch case).
 	addonDest := func(c romm.RomFileCategory) string {

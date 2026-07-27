@@ -39,6 +39,11 @@ type DownloadInput struct {
 	SearchFilter     string
 	SelectedFileID   int
 	SelectedAddonIDs []int // add-on RomFile IDs to fetch alongside the base game (categorized multi-part ROMs)
+	// IncludeAllAddons makes a bulk download grab each game's base plus every one
+	// of its updates/DLC without an add-on picker. It mirrors how bulk already
+	// fetches base/simple/multi-disc games: everything selected is (re)downloaded,
+	// with no skip-if-already-on-disk check.
+	IncludeAllAddons bool
 }
 
 type DownloadOutput struct {
@@ -61,7 +66,7 @@ func NewDownloadScreen() *DownloadScreen {
 	return &DownloadScreen{}
 }
 
-func (s *DownloadScreen) Execute(config internal.Config, host romm.Host, platform romm.Platform, selectedGames []romm.Rom, allGames []romm.Rom, searchFilter string, selectedFileID int, selectedAddonIDs []int) DownloadOutput {
+func (s *DownloadScreen) Execute(config internal.Config, host romm.Host, platform romm.Platform, selectedGames []romm.Rom, allGames []romm.Rom, searchFilter string, selectedFileID int, selectedAddonIDs []int, includeAllAddons bool) DownloadOutput {
 	result, err := s.draw(DownloadInput{
 		Config:           config,
 		Host:             host,
@@ -70,6 +75,7 @@ func (s *DownloadScreen) Execute(config internal.Config, host romm.Host, platfor
 		AllGames:         allGames,
 		SelectedFileID:   selectedFileID,
 		SelectedAddonIDs: selectedAddonIDs,
+		IncludeAllAddons: includeAllAddons,
 		SearchFilter:     searchFilter,
 	})
 
@@ -98,7 +104,7 @@ func (s *DownloadScreen) draw(input DownloadInput) (DownloadOutput, error) {
 		SearchFilter: input.SearchFilter,
 	}
 
-	downloads, artDownloads, gamelistEntries, ignoreDirs := s.buildDownloads(input.Config, input.Host, input.Platform, input.SelectedGames, input.SelectedFileID, input.SelectedAddonIDs)
+	downloads, artDownloads, gamelistEntries, ignoreDirs := s.buildDownloads(input.Config, input.Host, input.Platform, input.SelectedGames, input.SelectedFileID, input.SelectedAddonIDs, input.IncludeAllAddons)
 
 	// Nothing to fetch — e.g. every file was already downloaded and the user
 	// unchecked them all in the add-on picker. Skip the download manager.
@@ -393,7 +399,7 @@ func fileContentURL(host romm.Host, romID int, fileName string, fileID int) stri
 	return u + "?" + url.Values{"file_ids": {strconv.Itoa(fileID)}}.Encode()
 }
 
-func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, platform romm.Platform, games []romm.Rom, selectedFileID int, selectedAddonIDs []int) ([]gaba.Download, []artDownload, []gamelist.RomGameEntry, []string) {
+func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, platform romm.Platform, games []romm.Rom, selectedFileID int, selectedAddonIDs []int, includeAllAddons bool) ([]gaba.Download, []artDownload, []gamelist.RomGameEntry, []string) {
 	downloads := make([]gaba.Download, 0, len(games))
 	artDownloads := make([]artDownload, 0, len(games))
 	gamesSummaries := make([]gamelist.RomGameEntry, 0, len(games))
@@ -447,10 +453,17 @@ func (s *DownloadScreen) buildDownloads(config internal.Config, host romm.Host, 
 		// below so it keeps the game's artwork and gamelist entry.
 		var extraDownloads []gaba.Download
 		if g.HasAddons() {
+			// A bulk download (no add-on picker) grabs the base plus every one of
+			// this game's updates/DLC. Everything is (re)fetched, matching how bulk
+			// already treats base/simple/multi-disc games.
+			gameAddonIDs := addonIDSet
+			if includeAllAddons {
+				gameAddonIDs = autoAddonSelection(g)
+			}
 			// A configured per-platform, per-category add-on directory (e.g. a
 			// Switch emulator's watched update/DLC folders) overrides the default
 			// category subfolder placement.
-			plan := planRomDownloads(g, addonIDSet, romDirectory, func(cat romm.RomFileCategory) string {
+			plan := planRomDownloads(g, gameAddonIDs, romDirectory, func(cat romm.RomFileCategory) string {
 				return config.AddonDestination(gamePlatform, cat, romDirectory)
 			})
 			var base *plannedDownload

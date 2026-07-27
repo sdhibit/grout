@@ -81,14 +81,15 @@ func executeDownloadUI(state *AppState, r ui.GameDetailsOutput, stack *router.St
 	}
 
 	downloadScreen := ui.NewDownloadScreen()
-	downloadScreen.Execute(*state.Config, state.Host, r.Platform, []romm.Rom{r.Game}, allGames, searchFilter, selectedFileID, selectedAddonIDs)
+	downloadScreen.Execute(*state.Config, state.Host, r.Platform, []romm.Rom{r.Game}, allGames, searchFilter, selectedFileID, selectedAddonIDs, false)
 }
 
 func executeMultiDownloadUI(state *AppState, r ui.GameListOutput) {
-	// Bulk download from the games list grabs base games only; add-on selection
-	// is offered from a game's detail screen.
+	// Bulk download from the games list grabs each game's base plus all of its
+	// updates/DLC (no per-game add-on picker). Everything selected is fetched,
+	// matching how bulk already re-downloads base/simple/multi-disc games.
 	downloadScreen := ui.NewDownloadScreen()
-	downloadScreen.Execute(*state.Config, state.Host, r.Platform, r.SelectedGames, r.AllGames, r.SearchFilter, 0, nil)
+	downloadScreen.Execute(*state.Config, state.Host, r.Platform, r.SelectedGames, r.AllGames, r.SearchFilter, 0, nil, true)
 }
 
 func handlePlatformMappingUpdateUI(state *AppState, r ui.PlatformMappingOutput) {

@@ -22,6 +22,20 @@ type plannedDownload struct {
 	Download bool
 }
 
+// autoAddonSelection selects a categorized ROM's base file plus every supplemental
+// add-on (updates, DLC, patches). It's the implicit "grab everything" choice used
+// by bulk downloads, which run without the add-on picker; the returned map feeds
+// planRomDownloads exactly like a picker result would.
+func autoAddonSelection(rom romm.Rom) map[int]bool {
+	selected := make(map[int]bool, len(rom.Files))
+	for _, f := range rom.Files {
+		if f.IsBase() || f.Category.IsSupplementalAddon() {
+			selected[f.ID] = true
+		}
+	}
+	return selected
+}
+
 // planRomDownloads expands a categorized multi-part ROM into the concrete files
 // to download given the user's add-on selection.
 //
