@@ -229,13 +229,18 @@ func (s *AddonSelectionScreen) Draw(input AddonSelectionInput) (AddonSelectionRe
 		options.DeselectAllButton = gabaconst.VirtualButtonL1
 		// X opens the full file-names view (the picker rows are ellipsized).
 		options.ActionButton = gabaconst.VirtualButtonX
+		// Assign explicit footer groups so gabagool renders every hint. In its
+		// default (auto) mode the footer keeps only the first 2 items per side and
+		// silently drops the rest — with this many hints that would hide All and
+		// Download. The A-to-toggle hint is dropped on purpose: checking items with
+		// A is self-evident in a checklist, and cutting it keeps the footer narrow
+		// enough to fit the remaining hints on smaller screens.
 		options.FooterHelpItems = []gaba.FooterHelpItem{
 			FooterBack(),
-			{ButtonName: "A", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_toggle", Other: "Toggle"}, nil)},
-			{ButtonName: "X", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_view_names", Other: "Names"}, nil)},
-			{ButtonName: "L1", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_none", Other: "None"}, nil)},
-			{ButtonName: "R1", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_all", Other: "All"}, nil)},
-			{ButtonName: "Start", HelpText: i18n.Localize(&goi18n.Message{ID: "button_download", Other: "Download"}, nil)},
+			{ButtonName: "X", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_view_names", Other: "Names"}, nil), Group: gaba.FooterGroupLeft},
+			{ButtonName: "L1", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_none", Other: "None"}, nil), Group: gaba.FooterGroupRight},
+			{ButtonName: "R1", HelpText: i18n.Localize(&goi18n.Message{ID: "addon_all", Other: "All"}, nil), Group: gaba.FooterGroupRight},
+			{ButtonName: "Start", HelpText: i18n.Localize(&goi18n.Message{ID: "button_download", Other: "Download"}, nil), Group: gaba.FooterGroupRight},
 		}
 
 		result, err := gaba.List(options)
