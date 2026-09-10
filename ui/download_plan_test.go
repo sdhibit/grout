@@ -128,6 +128,51 @@ func TestAutoAddonSelectionPicksBaseAndAllSupplemental(t *testing.T) {
 	}
 }
 
+func TestAutoAddonSelectionCollapsesSwitchUpdates(t *testing.T) {
+	// A Switch game with two updates and two DLC. Bulk should grab base + only the
+	// newest update ([v131072]) + both DLC.
+	rom := romm.Rom{
+		ID:             9,
+		PlatformFSSlug: "switch",
+		Files: []romm.RomFile{
+			{ID: 10, FileName: "Zelda.nsp"},
+			{ID: 11, FileName: "Zelda [v65536].nsp", Category: romm.RomFileUpdate},
+			{ID: 12, FileName: "Zelda [v131072].nsp", Category: romm.RomFileUpdate}, // newest
+			{ID: 13, FileName: "Zelda-dlc1.nsp", Category: romm.RomFileDLC},
+			{ID: 14, FileName: "Zelda-dlc2.nsp", Category: romm.RomFileDLC},
+		},
+	}
+	sel := autoAddonSelection(rom)
+
+	for _, id := range []int{10, 12, 13, 14} { // base, newest update, both DLC
+		if !sel[id] {
+			t.Errorf("expected file %d to be selected", id)
+		}
+	}
+	if sel[11] {
+		t.Error("superseded update [v65536] should not be selected on a cumulative-update platform")
+	}
+}
+
+func TestAutoAddonSelectionKeepsAllUpdatesForUnknownPlatform(t *testing.T) {
+	// A platform without a known cumulative-update rule keeps every update.
+	rom := romm.Rom{
+		ID:             9,
+		PlatformFSSlug: "genesis",
+		Files: []romm.RomFile{
+			{ID: 10, FileName: "Game.bin"},
+			{ID: 11, FileName: "Game [v1].bin", Category: romm.RomFileUpdate},
+			{ID: 12, FileName: "Game [v2].bin", Category: romm.RomFileUpdate},
+		},
+	}
+	sel := autoAddonSelection(rom)
+	for _, id := range []int{10, 11, 12} {
+		if !sel[id] {
+			t.Errorf("expected file %d to be selected (all updates kept for unknown platform)", id)
+		}
+	}
+}
+
 func TestPlanAddonDestinationOverride(t *testing.T) {
 	// Redirect updates and DLC to an emulator-specific folder (the Switch case).
 	addonDest := func(c romm.RomFileCategory) string {

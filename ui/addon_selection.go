@@ -166,12 +166,27 @@ func (s *AddonSelectionScreen) Draw(input AddonSelectionInput) (AddonSelectionRe
 		sections = append(sections, section{addonCategoryLabel(group.Category), group.Files})
 	}
 
+	// On cumulative-update platforms (Switch) the newest update supersedes the
+	// older ones, so only it should default to checked. Older updates stay listed
+	// and toggleable, just unchecked.
+	latestUpdateID, collapseUpdates := 0, false
+	if game.UpdatesCumulative() {
+		if latest, ok := game.LatestUpdateFile(); ok {
+			latestUpdateID, collapseUpdates = latest.ID, true
+		}
+	}
+
 	// Checkbox state keyed by file ID, so it survives rebuilding the list when the
-	// user pops the file-names view. Defaults to checking what isn't downloaded yet.
+	// user pops the file-names view. Defaults to checking what isn't downloaded yet,
+	// minus superseded updates on a cumulative-update platform.
 	checked := make(map[int]bool)
 	for _, sec := range sections {
 		for _, f := range sec.files {
-			checked[f.ID] = !isDownloaded(f.ID)
+			defaultOn := !isDownloaded(f.ID)
+			if collapseUpdates && f.Category == romm.RomFileUpdate {
+				defaultOn = defaultOn && f.ID == latestUpdateID
+			}
+			checked[f.ID] = defaultOn
 		}
 	}
 

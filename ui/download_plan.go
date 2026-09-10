@@ -22,14 +22,31 @@ type plannedDownload struct {
 	Download bool
 }
 
-// autoAddonSelection selects a categorized ROM's base file plus every supplemental
-// add-on (updates, DLC, patches). It's the implicit "grab everything" choice used
-// by bulk downloads, which run without the add-on picker; the returned map feeds
-// planRomDownloads exactly like a picker result would.
+// autoAddonSelection selects a categorized ROM's base file plus its supplemental
+// add-ons for a bulk download (which runs without the add-on picker). All DLC and
+// patches are taken; updates follow the platform's update strategy — on a
+// cumulative-update platform (Switch) only the newest update is taken, since it
+// supersedes the earlier ones. The returned map feeds planRomDownloads exactly
+// like a picker result would.
 func autoAddonSelection(rom romm.Rom) map[int]bool {
+	latestUpdateID, collapseUpdates := 0, false
+	if rom.UpdatesCumulative() {
+		if latest, ok := rom.LatestUpdateFile(); ok {
+			latestUpdateID, collapseUpdates = latest.ID, true
+		}
+	}
+
 	selected := make(map[int]bool, len(rom.Files))
 	for _, f := range rom.Files {
-		if f.IsBase() || f.Category.IsSupplementalAddon() {
+		switch {
+		case f.IsBase():
+			selected[f.ID] = true
+		case f.Category == romm.RomFileUpdate:
+			// Skip superseded updates when the platform's updates are cumulative.
+			if !collapseUpdates || f.ID == latestUpdateID {
+				selected[f.ID] = true
+			}
+		case f.Category.IsSupplementalAddon(): // DLC, patches: always kept.
 			selected[f.ID] = true
 		}
 	}
